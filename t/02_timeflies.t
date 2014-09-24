@@ -88,6 +88,14 @@ $r->read( \$paragraph );
 
 if ( $r->ambiguity_metric() > 1 ) {
 
+    # print ASTs
+    while ( defined( my $value_ref = $r->value() ) ) {
+        say Dump ${ $value_ref };
+    }
+
+    # reset the recognizer (we used value() above)
+    $r->series_restart();
+
     # abstract syntax forest
     my $asf = Marpa::R2::ASF->new( { slr => $r } );
     die 'No ASF' if not defined $asf;
