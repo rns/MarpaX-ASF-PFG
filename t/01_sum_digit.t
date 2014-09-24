@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+# Copyright 2014 Ruslan Shvedov
 
 # Example from Parsing Techniques: A Practical Guide by Grune and Jacobs 2008 (G&J)
 # 3.7.4 Parse-Forest Grammars
@@ -56,10 +57,11 @@ if ( $r->ambiguity_metric() > 1 ){
 
     use_ok 'MarpaX::ASF::PFG';
 
+    # abstract syntax forest
     my $asf = Marpa::R2::ASF->new( { slr => $r } );
     die 'No ASF' if not defined $asf;
 
-    # create abstract syntax forest as a parse forest grammar
+    # parse forest grammar
     my $pfg = MarpaX::ASF::PFG->new($asf);
     isa_ok $pfg, 'MarpaX::ASF::PFG', 'pfg';
 
