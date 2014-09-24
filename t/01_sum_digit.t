@@ -100,7 +100,7 @@ if ( $r->ambiguity_metric() > 1 ){
 
     # get AST from pruned PFG
     my $ast = $pfg->ast;
-#    say "# ast ", Dump $ast;
+#    use YAML; say "# ast ", Dump $ast;
     is_deeply $ast, ${ $expected_ast }, "Sum of digits grammar";
 }
 
