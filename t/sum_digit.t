@@ -6,6 +6,8 @@ use YAML;
 
 use Marpa::R2;
 
+use Test::More;
+
 my $g = Marpa::R2::Scanless::G->new( {
     source => \(<<'END_OF_SOURCE'),
 :default ::= action => [ name, start, length, value]
@@ -26,31 +28,28 @@ EOI
 
 my $r = Marpa::R2::Scanless::R->new( {
     grammar => $g,
-#    trace_terminals => 1
 } );
 eval {$r->read(\$input)} || warn "Parse failure, progress report is:\n" . $r->show_progress;
 
-my $ast = $r->value;
+my $expected_ast = $r->value;
 
-unless (defined $ast){
+unless (defined $expected_ast){
     die "No parse";
 }
-
-my $pfg_index;
 
 if ( $r->ambiguity_metric() > 1 ){
 
     # gather parses
     my @asts;
-    my $v = $ast;
+    my $v = $expected_ast;
     do {
         push @asts, ${ $v };
     } until ( $v = $r->value() );
     push @asts, ${ $v };
     # print parse trees
-    say "Ambiguous: ", $#asts + 1, " parses.";
+#    diag "Ambiguous: ", $#asts + 1, " parses.";
     for my $i (0..$#asts){
-        say "# Parse Tree ", $i+1, ":\n", Dump $asts[$i];
+#        say "# Parse Tree ", $i+1, ":\n", Dump $asts[$i];
     }
 
     # reset the recognizer (we used value() above)
@@ -96,9 +95,8 @@ if ( $r->ambiguity_metric() > 1 ){
     );
 
     my $ast = $pfg->ast;
-    say "# ast ", Dump $ast;
+#    say "# ast ", Dump $ast;
+    is_deeply $ast, ${ $expected_ast }, "Sum of digits grammar";
 }
-else{
-    # print the unambiguous ast
-    say Dump $ast;
-}
+
+done_testing();

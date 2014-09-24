@@ -112,10 +112,10 @@ sub new {
         return \@return_value;
     } );
     $self->{pfg} = $pfg;
-    say "# pfg rules before pruning\n", $self->show_rules;
+#    say "# pfg rules before pruning\n", $self->show_rules;
 
     my $pfg_index = $self->build_index;
-    say "# pfg index ", Dump $pfg_index;
+#    say "# pfg index ", Dump $pfg_index;
 
     $self->{pfg_index} = $pfg_index;
 
@@ -204,7 +204,7 @@ sub prune{
         $self->prune_rule( $rule_id );
     }
 
-    say "# pfg rules after pruning\n", $self->show_rules;
+#    say "# pfg rules after pruning\n", $self->show_rules;
 #    say "# pfg index after pruning", Dump $pfg_index;
 }
 
