@@ -8,6 +8,8 @@ use Marpa::R2;
 
 use Test::More;
 
+use MarpaX::ASF::PFG;
+
 my $g = Marpa::R2::Scanless::G->new( {
     source => \(<<'END_OF_SOURCE'),
 :default ::= action => [ name, start, length, value]
@@ -39,19 +41,6 @@ unless (defined $expected_ast){
 
 if ( $r->ambiguity_metric() > 1 ){
 
-    # gather parses
-    my @asts;
-    my $v = $expected_ast;
-    do {
-        push @asts, ${ $v };
-    } until ( $v = $r->value() );
-    push @asts, ${ $v };
-    # print parse trees
-#    diag "Ambiguous: ", $#asts + 1, " parses.";
-    for my $i (0..$#asts){
-#        say "# Parse Tree ", $i+1, ":\n", Dump $asts[$i];
-    }
-
     # reset the recognizer (we used value() above)
     $r->series_restart();
 
@@ -59,7 +48,6 @@ if ( $r->ambiguity_metric() > 1 ){
     die 'No ASF' if not defined $asf;
 
     # create abstract syntax forest as a parse forest grammar
-    use MarpaX::ASF::PFG;
     my $pfg = MarpaX::ASF::PFG->new($asf);
     my $pfg_index = $pfg->{pfg_index};
 
