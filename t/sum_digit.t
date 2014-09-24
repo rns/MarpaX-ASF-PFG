@@ -1,15 +1,19 @@
+#!/usr/bin/perl
+
+# Example from Parsing Techniques: A Practical Guide by Grune and Jacobs 2008 (G&J)
+# 3.7.4 Parse-Forest Grammars
+
 use 5.010;
 use strict;
 use warnings;
 
-use YAML;
+use Test::More;
 
 use Marpa::R2;
 
-use Test::More;
-
-use MarpaX::ASF::PFG;
-
+#
+# grammar setup ()
+#
 my $g = Marpa::R2::Scanless::G->new( {
     source => \(<<'END_OF_SOURCE'),
 :default ::= action => [ name, start, length, value]
@@ -28,6 +32,9 @@ my $input = <<EOI;
 3+5+1
 EOI
 
+#
+# parse
+#
 my $r = Marpa::R2::Scanless::R->new( {
     grammar => $g,
 } );
@@ -44,15 +51,19 @@ if ( $r->ambiguity_metric() > 1 ){
     # reset the recognizer (we used value() above)
     $r->series_restart();
 
+    use_ok 'MarpaX::ASF::PFG';
+
     my $asf = Marpa::R2::ASF->new( { slr => $r } );
     die 'No ASF' if not defined $asf;
 
     # create abstract syntax forest as a parse forest grammar
     my $pfg = MarpaX::ASF::PFG->new($asf);
+    isa_ok $pfg, 'MarpaX::ASF::PFG', 'pfg';
+
     my $pfg_index = $pfg->{pfg_index};
 
     $pfg->prune(
-        # GJ:
+        # G&J:
         # + operator is left-associative, which means that a+b+c should be parsed as
         # ((a+b)+c) rather than as (a+(b+c)).
         # The criterion would then be that for each node that has a + operator,
