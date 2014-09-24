@@ -65,13 +65,13 @@ if ( $r->ambiguity_metric() > 1 ){
 
     my $pfg_index = $pfg->{pfg_index};
 
-    # G&J:
+    # G&J 3.7.3.2 Retrieving Parse Trees from a Parse Forest:
     # + operator is left-associative, which means that a+b+c should be parsed as
     # ((a+b)+c) rather than as (a+(b+c)).
     # The criterion would then be that for each node that has a + operator,
     # its right operand cannot be a non-terminal that has a node with a + operator.
     $pfg->prune(
-        # the below sub checks PRG's rules against the above criterion
+        # the below sub checks the PFG's rules against the above criterion
         # returning 1 if a rule meets them, 0 otherwise
         sub {
             my ($rule_id, $lhs, $rhs) = @_;
