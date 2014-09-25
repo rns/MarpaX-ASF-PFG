@@ -109,3 +109,4 @@ if ( $r->ambiguity_metric() > 1 ) {
     diag $pfg->show_rules;
 }
 
+done_testing;

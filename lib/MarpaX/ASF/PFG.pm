@@ -12,10 +12,11 @@ sub new {
     my ($class, $asf) = @_;
 
     my $self = {};
-
     bless $self, $class;
 
+    $self->{asf} = $asf;
     my $g = $asf->grammar();
+
     my $pfg = $asf->traverse( [], sub{
         # This routine converts the glade into a list of elements.  It is called recursively.
         my ($glade, $pfg)     = @_;
@@ -143,7 +144,7 @@ sub build_index{
     my $pfg = $self->{pfg};
     my $pfg_index = {};
 
-    pfg_traverse($pfg, sub {
+    pfg_enumerate($pfg, sub {
         my ($rule_id, $lhs, $rhs) = @_;
         # Symbol on the LHS of Rule $rule_id
         $pfg_index->{$lhs}->{lhs}->{$rule_id} = undef;
@@ -176,7 +177,7 @@ sub prune_rule{
         my $rhs_symbol = $rhs[$i];
         # check if $rhs_symbol is not on RHS of any other rule
         my $inaccessible = 1;
-        pfg_traverse($pfg, sub{
+        pfg_enumerate($pfg, sub{
             my ($rule_id, $lhs, $rhs) = @_;
             if ($inaccessible){
                 for my $i (0..@$rhs-1){
@@ -205,7 +206,7 @@ sub prune{
     # traverse $pfg calling $pruner for each rule and marking
     # the rule for deletion if $pruner returns 1
     my @rules_to_prune;
-    pfg_traverse($pfg, sub{
+    pfg_enumerate($pfg, sub{
         my ($rule_id, $lhs, $rhs) = @_;
         if ( $pruner->($rule_id, $lhs, $rhs) ){
             push @rules_to_prune, $rule_id;
@@ -232,26 +233,26 @@ sub show_rules{
     my ($self) = @_;
     my $pfg = $self->{pfg};
     my @lines;
-    pfg_traverse($pfg, sub {
+    pfg_enumerate($pfg, sub {
         my ($rule_id, $lhs, $rhs) = @_;
         push @lines, pfg_show_rule($pfg, $rule_id, $lhs, $rhs);
     });
     return join "\n", @lines;
 }
 
-sub pfg_traverse{
-    my ($pfg, $traverser) = @_;
+sub pfg_enumerate{
+    my ($pfg, $enumerator) = @_;
     for my $i (0..@$pfg-1){
         my $rule = $pfg->[$i];
         my ($lhs, @rhs) = @$rule;
-        $traverser->( $i, $lhs, \@rhs );
+        $enumerator->( $i, $lhs, \@rhs );
     }
 }
 
-sub pfg_rule_to_ast_node{
+sub rule_to_ast_node{
+    my ($self, $rule_id) = @_;
 
-    my ($pfg_index, $pfg, $rule_id) = @_;
-    my ($pfg_lhs, @pfg_rhs) = @{ $pfg->[ $rule_id ] };
+    my ($pfg_lhs, @pfg_rhs) = @{ $self->{pfg}->[ $rule_id ] };
 
 #    say "# Rule $rule_id:\n", pfg_show_rule($pfg, $rule_id, $pfg_lhs, \@pfg_rhs);
 
@@ -269,12 +270,12 @@ sub pfg_rule_to_ast_node{
         map {
             my $pfg_rhs_symbol = $_;
 #            say "pfg rhs symbol: $pfg_rhs_symbol";
-            if ( exists $pfg_index->{$pfg_rhs_symbol}->{lhs} ){ # non-terminal
+            if ( not $self->is_terminal( $pfg_rhs_symbol ) ){ # non-terminal
 
 #                say "non-terminal $pfg_rhs_symbol";
 
-                my $next_rule_id = (keys %{ $pfg_index->{$pfg_rhs_symbol}->{lhs} })[0];
-                pfg_rule_to_ast_node( $pfg_index, $pfg, $next_rule_id )
+                my $next_rule_id = $self->rule_id( $pfg_rhs_symbol );
+                $self->rule_to_ast_node( $next_rule_id )
             }
             else{ # terminal
 #                say "terminal $pfg_rhs_symbol";
@@ -286,8 +287,7 @@ sub pfg_rule_to_ast_node{
 
 sub ast{
     my ($self) = @_;
-    my $pfg = $self->{pfg};
-    my $ast = pfg_rule_to_ast_node( $self->{pfg_index}, $pfg, 0 );
+    my $ast = $self->rule_to_ast_node( 0 );
     return $ast;
 }
 
