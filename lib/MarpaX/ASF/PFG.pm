@@ -82,6 +82,7 @@ sub new {
             # All PFG rules must be in the scratch pad now so we just return them
             # assuming the the first PFG's symbol is its start
             if ( $symbol_name eq '[:start]' ) {
+                $self->{start} = $pfg->[0]->[0];
                 return $pfg;
             }
 
@@ -112,7 +113,19 @@ sub new {
         # Return the list of elements for this glade
         return \@return_value;
     } );
-    $self->{pfg} = $pfg;
+
+    # delete duplicate rules
+    my %rules;
+    my @unique_rules;
+    for my $i (0..@$pfg-1){
+        my $rule = $pfg->[$i];
+        my ($lhs, @rhs) = @$rule;
+        my $rule_shown = join ' ', $lhs, '::=', @rhs;
+#        say "Rule: $rule_shown";
+        push @unique_rules, $rule unless exists $rules{$rule_shown};
+        $rules{$rule_shown} = undef;
+    }
+    $self->{pfg} = \@unique_rules;
 #    say "# pfg rules before pruning\n", $self->show_rules;
 
     my $pfg_index = $self->build_index;
@@ -123,9 +136,9 @@ sub new {
     return $self;
 }
 
-sub has_symbol{
-    my ($self, $rule_id, $symbol) = @_;
-    return exists $self->{pfg_index}->{"+"}->{rhs}->{1}->{$rule_id};
+sub has_symbol_at{
+    my ($self, $rule_id, $symbol, $at) = @_;
+    return exists $self->{pfg_index}->{$symbol}->{rhs}->{$at}->{$rule_id};
 }
 
 sub is_terminal{
@@ -265,8 +278,8 @@ sub rule_to_ast_node{
 
     return [
         join('_', @ast_lhs),
-        $start,
-        $length,
+#        $start,
+#        $length,
         map {
             my $pfg_rhs_symbol = $_;
 #            say "pfg rhs symbol: $pfg_rhs_symbol";
@@ -287,7 +300,7 @@ sub rule_to_ast_node{
 
 sub ast{
     my ($self) = @_;
-    my $ast = $self->rule_to_ast_node( 0 );
+    my $ast = $self->rule_to_ast_node( $self->rule_id( $self->{start} ) );
     return $ast;
 }
 

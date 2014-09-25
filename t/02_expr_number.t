@@ -19,19 +19,22 @@ use_ok 'MarpaX::ASF::PFG';
 #
 my $ug = Marpa::R2::Scanless::G->new( { source => \(<<'END_OF_SOURCE'),
 
-:default ::= action => [ name, start, length, value ]
-lexeme default = action => [ name, start, length, value ] latm => 1
+:default ::= action => [ name, value ]
+lexeme default = action => [ name, value ] latm => 1
 
     Expr ::=
           Number
-        | '(' Expr ')'      assoc => group
+        | ('(') Expr (')')  assoc => group
        || Expr '**' Expr    assoc => right
        || Expr '*' Expr     # left associativity is by default
         | Expr '/' Expr
        || Expr '+' Expr
         | Expr '-' Expr
 
-        Number ~ [\d]+
+    Number ~ [\d]+
+
+:discard ~ whitespace
+whitespace ~ [\s]+
 
 END_OF_SOURCE
 } );
@@ -46,7 +49,7 @@ lexeme default = action => [ name, start, length, value] latm => 1
 
     Expr ::=
           Number
-       | '(' Expr ')'
+       | ('(') Expr (')')
        | Expr '**' Expr
        | Expr '*' Expr
        | Expr '/' Expr
@@ -55,19 +58,30 @@ lexeme default = action => [ name, start, length, value] latm => 1
 
     Number ~ [\d]+
 
+:discard ~ whitespace
+whitespace ~ [\s]+
+
 END_OF_SOURCE
 } );
 
-my $input = q{4+5*6+8};
+=pod tests
+42*2+7/3 42*(2+7)/3 2**7-3 2**(7-3)
+3+5+1
+((4+(5*6))+8)
+6/6/6
+6**6**6
+=cut
+my @input = qw{
+4+5*6+8
+};
 
 # parse input with unambiguous and ambiguous grammars
 # the results must be the same
-for my $in ($input){
+for my $input (@input){
 
-    # parse with Unambiguous G & R
-    my $ur = Marpa::R2::Scanless::R->new( { grammar => $ug } );
-    $ur->read(\$input);
-    my $expected_ast = ${ $ur->value };
+    diag $input;
+    # unambiguous grammar
+    my $expected_ast = ${ $ug->parse( \$input ) };
     use YAML; say Dump $expected_ast;
 
     # parse with Ambiguous G & R
@@ -81,23 +95,50 @@ for my $in ($input){
     # prune PFG to get the right AST
     # + - * and / are left-associative, while ** is right-associative
     $pfg->prune(
-        sub {
+        sub { # return 1 if the rule needs to be pruned, 0 otherwise
             my ($rule_id, $lhs, $rhs) = @_;
-            # The criterion would then be that for each node that has a + operator,
-            # its right operand cannot be a non-terminal that has a node with a + operator.
-            return (
-                        $pfg->has_symbol ( $rule_id, '+') # rule has + and its right
-                and not $pfg->is_terminal( $rhs->[2]    ) # operand is a non-terminal
-                and     $pfg->has_symbol ( $pfg->rule_id( $rhs->[2] ), '+' ) # and has +
-            );
+            # for each rule that has a + - * / operator,
+            # its right operand cannot be a non-terminal
+            # that has a node with any such operator.
+            for my $op (qw{ + * - / }){
+                say "# checking R$rule_id for $op";
+                if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
+                    say "R$rule_id has $op";
+                    for my $op_right (qw{ + * - / }){
+                        if (    not $pfg->is_terminal( $rhs->[2] )
+                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
+                            ){
+                            say "Needs pruning";
+                            return 1;
+                        }
+                    }
+                }
+                return 0;
+            }
+
+            # for each rule that has a ** operator,
+            # its left operand cannot be a non-terminal
+            # that has a node with the same operator.
+            say "# checking R$rule_id for **";
+            if ( $pfg->has_symbol_at ( $rule_id, '**', 1 ) ){
+                say "R$rule_id has **";
+                return (
+                    not $pfg->is_terminal( $rhs->[0] )
+                    and     $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), '**', 1 )
+                )
+            }
+
+            return 0;
         }
     );
 
+    say "# PFG after pruning:\n", $pfg->show_rules;
+
     # AST from pruned PFG
     my $ast = $pfg->ast;
+    use YAML; say Dump $ast;
 
-    is_deeply $ast, $expected_ast, "expression of numbers";
-
+    is_deeply $ast, $expected_ast, $input;
 }
 
 
