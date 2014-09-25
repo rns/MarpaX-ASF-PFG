@@ -15,8 +15,7 @@ use Marpa::R2;
 #
 # Unambiguous grammar
 #
-my $ug = Marpa::R2::Scanless::G->new( {
-    source => \(<<'END_OF_SOURCE'),
+my $ug = Marpa::R2::Scanless::G->new( { source => \(<<'END_OF_SOURCE'),
 :default ::= action => [ name, start, length, value]
 lexeme default = action => [ name, start, length, value] latm => 1
 
@@ -30,8 +29,7 @@ END_OF_SOURCE
 #
 # Ambiguous grammar (G&J Fig. 3.1.)
 #
-my $ag = Marpa::R2::Scanless::G->new( {
-    source => \(<<'END_OF_SOURCE'),
+my $ag = Marpa::R2::Scanless::G->new( { source => \(<<'END_OF_SOURCE'),
 :default ::= action => [ name, start, length, value]
 lexeme default = action => [ name, start, length, value] latm => 1
 
@@ -73,34 +71,18 @@ for my $in ($input){
     # G&J 3.7.3.2 Retrieving Parse Trees from a Parse Forest:
     # + operator is left-associative, which means that a+b+c should be parsed as
     # ((a+b)+c) rather than as (a+(b+c)).
-    # The criterion would then be that for each node that has a + operator,
-    # its right operand cannot be a non-terminal that has a node with a + operator.
     $pfg->prune(
         # the below sub checks the PFG's rules against the above criterion
         # returning 1 if a rule meets them, 0 otherwise
         sub {
             my ($rule_id, $lhs, $rhs) = @_;
-        #    say "# pruning rule: ", pfg_show_rule(undef, $rule_id, $lhs, $rhs);
-            # check if the node has a + operator (literals are wrapped in ''s)
-            # $pfg->has_symbol($rule_id, $symbol)
-            if ( exists $pfg_index->{"+"}->{rhs}->{1}->{$rule_id} ){
-        #        say "# has '+':\n", pfg_show_rule(undef, $rule_id, $lhs, $rhs);
-                # its right operand cannot be a non-terminal that has a node with a + operator.
-                my $r_op = $rhs->[2];
-        #        say "# right operand:\n", $r_op;
-                # check if $r_op is a non-terminal
-                # $pfg->is_terminal($symbol)
-                if (exists $pfg_index->{$r_op}->{lhs}){
-        #            say "is a non-terminal.";
-                    # check if $r_op has a + operator
-                    # $pfg->rule_id($lhs);
-                    my $r_op_rule_id = (keys %{ $pfg_index->{$r_op}->{lhs} })[0];
-        #            say "right operand rule id: $r_op_rule_id";
-                    if ( exists $pfg_index->{"+"}->{rhs}->{1}->{$r_op_rule_id} ){
-        #                say "right operand has +!";
-                        return 1;
-                    }
-                }
+            # The criterion would then be that for each node that has a + operator,
+            # its right operand cannot be a non-terminal that has a node with a + operator.
+            if (        $pfg->has_symbol ( $rule_id, '+') # rule has +, its
+                and not $pfg->is_terminal( $rhs->[2]    ) # right operand is a non-terminal
+                and     $pfg->has_symbol ( $pfg->rule_id( $rhs->[2] ), '+' ) # and has +
+                ){
+                return 1;
             }
             return 0;
         }

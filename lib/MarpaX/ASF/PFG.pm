@@ -122,6 +122,21 @@ sub new {
     return $self;
 }
 
+sub has_symbol{
+    my ($self, $rule_id, $symbol) = @_;
+    return exists $self->{pfg_index}->{"+"}->{rhs}->{1}->{$rule_id};
+}
+
+sub is_terminal{
+    my ($self, $symbol) = @_;
+    return not exists $self->{pfg_index}->{$symbol}->{lhs};
+}
+
+sub rule_id{
+    my ($self, $lhs) = @_;
+    return ( keys %{ $self->{pfg_index}->{$lhs}->{lhs} } )[ 0 ];
+}
+
 sub build_index{
     my ($self) = @_;
 
