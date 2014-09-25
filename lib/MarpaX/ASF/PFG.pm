@@ -157,7 +157,7 @@ sub build_index{
     my $pfg = $self->{pfg};
     my $pfg_index = {};
 
-    pfg_enumerate($pfg, sub {
+    $self->enumerate( sub {
         my ($rule_id, $lhs, $rhs) = @_;
         # Symbol on the LHS of Rule $rule_id
         $pfg_index->{$lhs}->{lhs}->{$rule_id} = undef;
@@ -177,7 +177,7 @@ sub prune_rule{
     my $pfg = $self->{pfg};
 
     my ($lhs, @rhs) = @{ $pfg->[ $rule_id ] };
-#    say "# pruning:\n", pfg_show_rule(undef, $rule_id, $lhs, \@rhs);
+    say "# pruning:\n", pfg_show_rule(undef, $rule_id, $lhs, \@rhs);
 
     # remove from the grammar
     splice(@$pfg, $rule_id, 1);
@@ -190,14 +190,14 @@ sub prune_rule{
         my $rhs_symbol = $rhs[$i];
         # check if $rhs_symbol is not on RHS of any other rule
         my $inaccessible = 1;
-        pfg_enumerate($pfg, sub{
+        $self->enumerate( sub{
             my ($rule_id, $lhs, $rhs) = @_;
             if ($inaccessible){
                 for my $i (0..@$rhs-1){
                     # if $rhs_symbol exist on an RHS of any rule, it's not inaccessible
-#                    say "checking $rhs_symbol vs. $rhs->[$i]";
+                    say "checking $rhs_symbol vs. $rhs->[$i]";
                     if ( $rhs_symbol eq $rhs->[$i]){
-#                        say "$rhs_symbol is accessible, returning...";
+                        say "$rhs_symbol is accessible, returning...";
                         $inaccessible = 0;
                     }
                 }
@@ -205,7 +205,7 @@ sub prune_rule{
         });
         # remove $rhs_symbol if it is found to be inaccessible
         if ( $inaccessible ){
-#            say "$rhs_symbol is inaccessible";
+            say "$rhs_symbol is inaccessible, pruning...";
             if ( exists $pfg_index->{$rhs_symbol}->{lhs} ){
                 $self->prune_rule( (keys %{ $pfg_index->{$rhs_symbol}->{lhs} })[0]);
             }
@@ -218,20 +218,27 @@ sub prune{
     my $pfg = $self->{pfg};
     # traverse $pfg calling $pruner for each rule and marking
     # the rule for deletion if $pruner returns 1
-    my @rules_to_prune;
-    pfg_enumerate($pfg, sub{
+    my %rules_to_prune;
+    $self->enumerate( sub{
         my ($rule_id, $lhs, $rhs) = @_;
         if ( $pruner->($rule_id, $lhs, $rhs) ){
-            push @rules_to_prune, $rule_id;
+            $rules_to_prune{$rule_id} = undef;
         }
     });
 
-#    say "rules to prune: ", join ', ', map { "R$_" } @rules_to_prune;
+    say "rules to prune: ", join ', ', map { "R$_" } keys %rules_to_prune;
 
     # remove rules to prune
-    for my $rule_id (@rules_to_prune){
-        $self->prune_rule( $rule_id );
+    my @new_pfg;
+    for my $rule_id (0..@$pfg-1){
+        push @new_pfg, $pfg->[$rule_id] unless exists $rules_to_prune{$rule_id};
     }
+    $self->{pfg} = \@new_pfg;
+    # rebuild index
+    $self->{pfg_index} = $self->build_index($pfg);
+
+    # remove symbols inaccessible from the top
+#        $self->prune_rule( $rule_id );
 
 #    say "# pfg rules after pruning\n", $self->show_rules;
 #    say "# pfg index after pruning", Dump $pfg_index;
@@ -246,14 +253,25 @@ sub show_rules{
     my ($self) = @_;
     my $pfg = $self->{pfg};
     my @lines;
-    pfg_enumerate($pfg, sub {
+    $self->enumerate( sub {
         my ($rule_id, $lhs, $rhs) = @_;
         push @lines, pfg_show_rule($pfg, $rule_id, $lhs, $rhs);
     });
     return join "\n", @lines;
 }
 
-sub pfg_enumerate{
+sub enumerate{
+    my ($self, $enumerator) = @_;
+    my $pfg = $self->{pfg};
+    for my $i (0..@$pfg-1){
+        my $rule = $pfg->[$i];
+        my ($lhs, @rhs) = @$rule;
+        $enumerator->( $i, $lhs, \@rhs );
+    }
+}
+
+
+sub traverse{
     my ($pfg, $enumerator) = @_;
     for my $i (0..@$pfg-1){
         my $rule = $pfg->[$i];

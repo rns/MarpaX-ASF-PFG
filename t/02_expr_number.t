@@ -12,6 +12,8 @@ use Test::More;
 
 use Marpa::R2;
 
+use Carp::Always;
+
 use_ok 'MarpaX::ASF::PFG';
 
 #
@@ -19,12 +21,11 @@ use_ok 'MarpaX::ASF::PFG';
 #
 my $ug = Marpa::R2::Scanless::G->new( { source => \(<<'END_OF_SOURCE'),
 
-:default ::= action => [ name, value ]
-lexeme default = action => [ name, value ] latm => 1
+:default ::= action => [ name, value]
+lexeme default = action => [ name, value] latm => 1
 
     Expr ::=
           Number
-        | ('(') Expr (')')  assoc => group
        || Expr '**' Expr    assoc => right
        || Expr '*' Expr     # left associativity is by default
         | Expr '/' Expr
@@ -49,7 +50,6 @@ lexeme default = action => [ name, start, length, value] latm => 1
 
     Expr ::=
           Number
-       | ('(') Expr (')')
        | Expr '**' Expr
        | Expr '*' Expr
        | Expr '/' Expr
@@ -64,14 +64,15 @@ whitespace ~ [\s]+
 END_OF_SOURCE
 } );
 
-=pod tests
-42*2+7/3 42*(2+7)/3 2**7-3 2**(7-3)
+my @input = qw{
+2**7-3*10
 3+5+1
-((4+(5*6))+8)
 6/6/6
 6**6**6
-=cut
-my @input = qw{
+3+5+1
+6/6/6
+6**6**6
+42*2+7/3
 4+5*6+8
 };
 
@@ -103,17 +104,17 @@ for my $input (@input){
             for my $op (qw{ + * - / }){
                 say "# checking R$rule_id for $op";
                 if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
-                    say "R$rule_id has $op";
+                    say "$lhs has $op";
+#                    for my $op_right (qw{ + * - / }){
                     for my $op_right (qw{ + * - / }){
                         if (    not $pfg->is_terminal( $rhs->[2] )
                             and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
                             ){
-                            say "Needs pruning";
+                            say "Needs pruning because $rhs->[2] has $op_right";
                             return 1;
                         }
                     }
                 }
-                return 0;
             }
 
             # for each rule that has a ** operator,
@@ -122,10 +123,12 @@ for my $input (@input){
             say "# checking R$rule_id for **";
             if ( $pfg->has_symbol_at ( $rule_id, '**', 1 ) ){
                 say "R$rule_id has **";
-                return (
-                    not $pfg->is_terminal( $rhs->[0] )
+                if ( not $pfg->is_terminal( $rhs->[0] )
                     and     $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), '**', 1 )
-                )
+                    ){
+                    say "Needs pruning";
+                    return 1;
+                }
             }
 
             return 0;
