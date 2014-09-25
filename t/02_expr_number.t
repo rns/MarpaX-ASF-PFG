@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 # Copyright 2014 Ruslan Shvedov
 
-# Example from Parsing Techniques: A Practical Guide by Grune and Jacobs 2008 (G&J)
-# 3.7.4 Parse-Forest Grammars
+# Problem 3.10 from Parsing Techniques: A Practical Guide by Grune and Jacobs 2008 (G&J)
+# adapted to Marpa::R2 SLIF
 
 use 5.010;
 use strict;
@@ -15,34 +15,50 @@ use Marpa::R2;
 use_ok 'MarpaX::ASF::PFG';
 
 #
-# Unambiguous grammar to parse sum of digits expression
+# Unambiguous grammar to parse expressions on numbers
 #
 my $ug = Marpa::R2::Scanless::G->new( { source => \(<<'END_OF_SOURCE'),
-:default ::= action => [ name, start, length, value]
-lexeme default = action => [ name, start, length, value] latm => 1
 
-    Sum ::= Sum '+' Sum assoc => left
-    Sum ::= Digit
-    Digit ~ '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+:default ::= action => [ name, start, length, value ]
+lexeme default = action => [ name, start, length, value ] latm => 1
+
+    Expr ::=
+          Number
+        | '(' Expr ')'      assoc => group
+       || Expr '**' Expr    assoc => right
+       || Expr '*' Expr     # left associativity is by default
+        | Expr '/' Expr
+       || Expr '+' Expr
+        | Expr '-' Expr
+
+        Number ~ [\d]+
 
 END_OF_SOURCE
 } );
 
 #
-# Ambiguous grammar (G&J Fig. 3.1.)
+# Ambiguous grammar
 #
 my $ag = Marpa::R2::Scanless::G->new( { source => \(<<'END_OF_SOURCE'),
+
 :default ::= action => [ name, start, length, value]
 lexeme default = action => [ name, start, length, value] latm => 1
 
-    Sum ::= Sum '+' Sum
-    Sum ::= Digit
-    Digit ~ '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+    Expr ::=
+          Number
+       | '(' Expr ')'
+       | Expr '**' Expr
+       | Expr '*' Expr
+       | Expr '/' Expr
+       | Expr '+' Expr
+       | Expr '-' Expr
+
+    Number ~ [\d]+
 
 END_OF_SOURCE
 } );
 
-my $input = q{3+5+1};
+my $input = q{4+5*6+8};
 
 # parse input with unambiguous and ambiguous grammars
 # the results must be the same
@@ -52,23 +68,18 @@ for my $in ($input){
     my $ur = Marpa::R2::Scanless::R->new( { grammar => $ug } );
     $ur->read(\$input);
     my $expected_ast = ${ $ur->value };
+    use YAML; say Dump $expected_ast;
 
     # parse with Ambiguous G & R
     my $ar = Marpa::R2::Scanless::R->new( { grammar => $ag } );
     $ar->read(\$input);
 
-    # abstract syntax forest (ASF)
-    my $asf = Marpa::R2::ASF->new( { slr => $ar } );
-    die 'No ASF' if not defined $asf;
-
-    # parse forest grammar (PFG) from ASF
-    my $pfg = MarpaX::ASF::PFG->new($asf);
-    isa_ok $pfg, 'MarpaX::ASF::PFG', 'pfg';
+    # parse forest grammar (PFG) from abstract syntax forest (ASF)
+    my $pfg = MarpaX::ASF::PFG->new( Marpa::R2::ASF->new( { slr => $ar } ) );
+    say $pfg->show_rules;
 
     # prune PFG to get the right AST
-    # G&J 3.7.3.2 Retrieving Parse Trees from a Parse Forest:
-    # + operator is left-associative, which means that a+b+c should be parsed as
-    # ((a+b)+c) rather than as (a+(b+c)).
+    # + - * and / are left-associative, while ** is right-associative
     $pfg->prune(
         sub {
             my ($rule_id, $lhs, $rhs) = @_;
@@ -85,7 +96,7 @@ for my $in ($input){
     # AST from pruned PFG
     my $ast = $pfg->ast;
 
-    is_deeply $ast, $expected_ast, "sum of digits";
+    is_deeply $ast, $expected_ast, "expression of numbers";
 
 }
 
