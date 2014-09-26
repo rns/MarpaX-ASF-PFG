@@ -150,52 +150,11 @@ cannot be a non-terminal that has a node with a + - * / operator.
         sub { # return 1 if the rule needs to be pruned, 0 otherwise
             my ($rule_id, $lhs, $rhs) = @_;
 
-            # left associativity of + and - (2-1+5)
-            # for each node that has a + or - operator, its right operand
-            # cannot be a non-terminal that has a node with that operator.
-            for my $op (qw{ + - }){
-                if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
-                    for my $op_right (qw{ + - }){
-                        say "\n# checking R$rule_id $lhs for left associativity $op vs. $op_right";
-                        if (    not $pfg->is_terminal( $rhs->[2] )
-                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
-                            ){
-                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_right";
-                            return 1;
-                        }
-                    }
-                }
-            }
-
-            # left associativity of * and / (2/1*5)
-            # for each node that has a * or / operator, its right operand
-            # cannot be a non-terminal that has a node with that operator.
-            for my $op (qw{ * / }){
-                if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
-                    for my $op_right (qw{ * / }){
-                        say "\n# checking R$rule_id $lhs for left associativity $op vs. $op_right";
-                        if (    not $pfg->is_terminal( $rhs->[2] )
-                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
-                            ){
-                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_right";
-                            return 1;
-                        }
-                    }
-                }
-            }
-
-            # right associativity of **
-            # for each rule that has a ** operator, its left operand
-            # cannot be a non-terminal that has a node with the same operator.
-#            say "# checking R$rule_id $lhs for **";
-            if ( $pfg->has_symbol_at ( $rule_id, '**', 1 ) ){
-#                say "  R$rule_id $lhs has **";
-                if ( not $pfg->is_terminal( $rhs->[0] )
-                    and     $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), '**', 1 )
-                    ){
-                    say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has **";
-                    return 1;
-                }
+            if (   assoc_left  ( $pfg, $rule_id, $lhs, $rhs, qw{ + - } )
+                or assoc_left  ( $pfg, $rule_id, $lhs, $rhs, qw{ * / } )
+                or assoc_right ( $pfg, $rule_id, $lhs, $rhs, qw{ ** } )
+                ){
+                return 1
             }
 
             # precedence of * and / over + and -
@@ -255,6 +214,45 @@ cannot be a non-terminal that has a node with a + - * / operator.
 
 }
 
-sub left_assoc
+# check rule $rule_id with $lhs, $rhs in $pfg for
+# left associativity of @ops, e.g. + and - (2-1+5)
+# for each node that has an operator in @ops, its right operand
+# cannot be a non-terminal that has a node with that operator.
+# return 1 if left associativity is broken by rule $rule_id, 0 otherwise
+sub assoc_left{
+    my ($pfg, $rule_id, $lhs, $rhs, @ops) = @_;
+    for my $op (@ops){
+        if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
+            for my $op_right (@ops){
+                if (    not $pfg->is_terminal( $rhs->[2] )
+                    and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
+                    ){
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+# check rule $rule_id with $lhs, $rhs in $pfg for
+# right associativity of @ops, e.g. ** (6**6**6)
+# for each rule that has an operator in @ops, its left operand
+# cannot be a non-terminal that has a node with the same operator.
+# return 1 if left associativity is broken by rule $rule_id, 0 otherwise
+sub assoc_right{
+    my ($pfg, $rule_id, $lhs, $rhs, @ops) = @_;
+    for my $op (@ops){
+        if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
+            for my $op_left (@ops){
+                if (    not $pfg->is_terminal( $rhs->[0] )
+                    and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), $op_left, 1 )
+                    ){
+                    return 1;
+                }
+            }
+        }
+    }
+}
 
 done_testing();
