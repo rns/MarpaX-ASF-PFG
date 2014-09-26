@@ -150,55 +150,14 @@ cannot be a non-terminal that has a node with a + - * / operator.
         sub { # return 1 if the rule needs to be pruned, 0 otherwise
             my ($rule_id, $lhs, $rhs) = @_;
 
-            if (   assoc_left  ( $pfg, $rule_id, $lhs, $rhs, qw{ + - } )
-                or assoc_left  ( $pfg, $rule_id, $lhs, $rhs, qw{ * / } )
-                or assoc_right ( $pfg, $rule_id, $lhs, $rhs, qw{ ** } )
+            my @rule = ($pfg, $rule_id, $lhs, $rhs);
+            if (   assoc_left  ( @rule, qw{ + - }                    )
+                or assoc_left  ( @rule, qw{ * / }                    )
+                or assoc_right ( @rule, qw{ **  }                    )
+                or prec        ( @rule, [qw{ * / }], [qw{ + -     }] )
+                or prec        ( @rule, [qw{ **  }], [qw{ * / + - }] )
                 ){
                 return 1
-            }
-
-            # precedence of * and / over + and -
-            # for each node that has a * or / operator, its right and left operands
-            # cannot be a non-terminal that has a node with a + or - operator.
-            for my $op_higher (qw{ * / }){
-                say "\n# checking R$rule_id $lhs for higher precedence of * and / over + and -";
-                if ( $pfg->has_symbol_at ( $rule_id, $op_higher, 1 ) ){
-                    for my $op_lower (qw{ + - }){
-                        if (    not $pfg->is_terminal( $rhs->[2] )
-                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_lower, 1 )
-                            ){
-                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_lower";
-                            return 1;
-                        }
-                        elsif (    not $pfg->is_terminal( $rhs->[0] )
-                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), $op_lower, 1 )
-                            ){
-                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has $op_lower";
-                            return 1;
-                        }
-                    }
-                }
-            }
-
-            # precedence of ** over + - * and /
-            for my $op_higher (qw{ ** }){
-                say "\n# checking R$rule_id $lhs for higher precedence of ** over * / + -";
-                if ( $pfg->has_symbol_at ( $rule_id, $op_higher, 1 ) ){
-                    for my $op_lower (qw{ * / + - }){
-                        if (    not $pfg->is_terminal( $rhs->[2] )
-                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_lower, 1 )
-                            ){
-                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_lower";
-                            return 1;
-                        }
-                        elsif (    not $pfg->is_terminal( $rhs->[0] )
-                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), $op_lower, 1 )
-                            ){
-                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has $op_lower";
-                            return 1;
-                        }
-                    }
-                }
             }
 
             return 0;
@@ -253,6 +212,34 @@ sub assoc_right{
             }
         }
     }
+    return 0;
+}
+
+# precedence of * and / over + and -
+# for each node that has a * or / operator, its right and left operands
+# cannot be a non-terminal that has a node with a + or - operator.
+sub prec{
+    my ($pfg, $rule_id, $lhs, $rhs, $ops_higher, $ops_lower) = @_;
+    for my $op_higher (@$ops_higher){
+        say "\n# checking R$rule_id $lhs for higher precedence of * and / over + and -";
+        if ( $pfg->has_symbol_at ( $rule_id, $op_higher, 1 ) ){
+            for my $op_lower (@$ops_lower){
+                if (    not $pfg->is_terminal( $rhs->[2] )
+                    and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_lower, 1 )
+                    ){
+                    say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_lower";
+                    return 1;
+                }
+                elsif (    not $pfg->is_terminal( $rhs->[0] )
+                    and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), $op_lower, 1 )
+                    ){
+                    say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has $op_lower";
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
 }
 
 done_testing();
