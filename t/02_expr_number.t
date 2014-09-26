@@ -14,6 +14,8 @@ use Marpa::R2;
 
 use Carp::Always;
 
+use YAML;
+
 use_ok 'MarpaX::ASF::PFG';
 
 #
@@ -73,6 +75,7 @@ my @input = qw{
 6/6/6
 6**6**6
 42*2+7/3
+42*2+7/3-1
 4+5*6+8
 };
 
@@ -83,7 +86,7 @@ for my $input (@input){
     diag $input;
     # unambiguous grammar
     my $expected_ast = ${ $ug->parse( \$input ) };
-    use YAML; say Dump $expected_ast;
+    say "# expected ast ", Dump $expected_ast;
 
     # parse with Ambiguous G & R
     my $ar = Marpa::R2::Scanless::R->new( { grammar => $ag } );
@@ -92,6 +95,7 @@ for my $input (@input){
     # parse forest grammar (PFG) from abstract syntax forest (ASF)
     my $pfg = MarpaX::ASF::PFG->new( Marpa::R2::ASF->new( { slr => $ar } ) );
     say $pfg->show_rules;
+    say $pfg->start;
 
     # prune PFG to get the right AST
     # + - * and / are left-associative, while ** is right-associative
@@ -100,13 +104,13 @@ for my $input (@input){
             my ($rule_id, $lhs, $rhs) = @_;
             # for each rule that has a + - * / operator,
             # its right operand cannot be a non-terminal
-            # that has a node with any such operator.
+            # that has a node with the same operator.
             for my $op (qw{ + * - / }){
                 say "# checking R$rule_id for $op";
                 if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
                     say "$lhs has $op";
+                    for my $op_right ($op){
 #                    for my $op_right (qw{ + * - / }){
-                    for my $op_right (qw{ + * - / }){
                         if (    not $pfg->is_terminal( $rhs->[2] )
                             and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
                             ){
@@ -136,6 +140,7 @@ for my $input (@input){
     );
 
     say "# PFG after pruning:\n", $pfg->show_rules;
+    say $pfg->start;
 
     # AST from pruned PFG
     my $ast = $pfg->ast;

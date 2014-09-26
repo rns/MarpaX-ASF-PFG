@@ -61,6 +61,8 @@ die 'No ASF' if not defined $asf;
 my $pfg = MarpaX::ASF::PFG->new($asf);
 isa_ok $pfg, 'MarpaX::ASF::PFG', 'pfg';
 
+#say "# before pruning:\n", $pfg->show_rules;
+
 # prune PFG to get the right AST
 # G&J 3.7.3.2 Retrieving Parse Trees from a Parse Forest:
 # + operator is left-associative, which means that a+b+c should be parsed as
@@ -75,6 +77,8 @@ $pfg->prune(
         and     $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), '+', 1 ) # and has +
     }
 );
+
+#say "# after pruning:\n", $pfg->show_rules;
 
 # AST from pruned PFG
 my $ast = $pfg->ast;

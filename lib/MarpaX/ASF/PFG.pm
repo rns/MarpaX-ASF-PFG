@@ -14,6 +14,15 @@ sub new {
     my $self = {};
     bless $self, $class;
 
+    # new from array of arrays
+    if (ref $asf eq "ARRAY"){
+        $self->{pfg} = $asf;
+        $self->{start} = $asf->[0]->[0];
+        $self->{pfg_index} = $self->build_index;
+        return $self;
+    }
+
+    # new from abstract syntax forest
     $self->{asf} = $asf;
     my $g = $asf->grammar();
 
@@ -126,11 +135,9 @@ sub new {
         $rules{$rule_shown} = undef;
     }
     $self->{pfg} = \@unique_rules;
-#    say "# pfg rules before pruning\n", $self->show_rules;
 
     my $pfg_index = $self->build_index;
 #    say "# pfg index ", Dump $pfg_index;
-
     $self->{pfg_index} = $pfg_index;
 
     return $self;
@@ -148,8 +155,10 @@ sub is_terminal{
 
 sub rule_id{
     my ($self, $lhs) = @_;
-    return ( keys %{ $self->{pfg_index}->{$lhs}->{lhs} } )[ 0 ];
+    return ( sort { $a <=> $b } keys %{ $self->{pfg_index}->{$lhs}->{lhs} } )[ 0 ];
 }
+
+sub start{ $_[0]->{start} }
 
 sub build_index{
     my ($self) = @_;
@@ -170,47 +179,87 @@ sub build_index{
     return $pfg_index;
 }
 
-# recursively remove rule $rule_id
-sub prune_rule{
+=pod Formal algorithm for finding productive non-terminals
 
-    my ($self, $rule_id) = @_;
+    1. Create a set of all the non-terminals that have just
+    terminal symbols or empty strings on the right-hand side (RHS): A1
+
+    2. Add to A1 the non-terminals that have on the RHS non-terminals
+    from A1 concatenated to terminal symbols: A2
+
+    3. Repeat step 2 until no more non-terminals are added to the set:
+    Ai+1 = Ai
+
+    4. The resulting set Ak consists of all productive nonterminals
+    (those non-terminals that generate strings)
+
+=cut
+
+sub cleanup{
+    my ($self) = @_;
     my $pfg = $self->{pfg};
+    my $pfg_index = $self->{pfg_index};
 
-    my ($lhs, @rhs) = @{ $pfg->[ $rule_id ] };
-    say "# pruning:\n", pfg_show_rule(undef, $rule_id, $lhs, \@rhs);
-
-    # remove from the grammar
-    splice(@$pfg, $rule_id, 1);
-
-    # rebuild index
-    my $pfg_index = $self->{pfg_index} = $self->build_index($pfg);
-
-    # remove other rules which become inaccessible from the top
-    for my $i (0..@rhs-1){
-        my $rhs_symbol = $rhs[$i];
-        # check if $rhs_symbol is not on RHS of any other rule
-        my $inaccessible = 1;
-        $self->enumerate( sub{
-            my ($rule_id, $lhs, $rhs) = @_;
-            if ($inaccessible){
-                for my $i (0..@$rhs-1){
-                    # if $rhs_symbol exist on an RHS of any rule, it's not inaccessible
-                    say "checking $rhs_symbol vs. $rhs->[$i]";
-                    if ( $rhs_symbol eq $rhs->[$i]){
-                        say "$rhs_symbol is accessible, returning...";
-                        $inaccessible = 0;
-                    }
-                }
-            }
-        });
-        # remove $rhs_symbol if it is found to be inaccessible
-        if ( $inaccessible ){
-            say "$rhs_symbol is inaccessible, pruning...";
-            if ( exists $pfg_index->{$rhs_symbol}->{lhs} ){
-                $self->prune_rule( (keys %{ $pfg_index->{$rhs_symbol}->{lhs} })[0]);
+    # find productive non-terminals
+    my $productive_non_terminals = {};
+    for my $rule_id (0..@$pfg-1){
+        my ($lhs, @rhs) = @{ $pfg->[ $rule_id ] };
+        my $all_terminals = 1;
+        for my $rhs_symbol (@rhs){
+            if ( not $self->is_terminal( $rhs_symbol ) ){
+                $all_terminals = 0;
+                last;
             }
         }
+        if ($all_terminals){
+            $productive_non_terminals->{$lhs}->{$rule_id} = undef;
+        }
     }
+#   say "Productive non-terminals: ", join ', ', sort keys %$productive_non_terminals;
+
+    # find rules that use only terminals and productive non-terminals
+FIND_MORE:
+    my $added_nothing = 1;
+RULE:
+    for my $rule_id (0..@$pfg-1){
+        my ($lhs, @rhs) = @{ $pfg->[ $rule_id ] };
+        # skip what we know is productive
+        next RULE if exists $productive_non_terminals->{$lhs};
+        my $only_terminals_and_productive_non_terminals = 1;
+#        say "checking rule $rule_id: $lhs";
+RHS_SYMBOL:
+        for my $rhs_symbol (@rhs){
+#            say "checking RHS symbol: $rhs_symbol";
+            # check if $rhs_symbol is a terminal
+            # or productive non-terminal
+            if (   $self->is_terminal( $rhs_symbol )
+                or exists $productive_non_terminals->{ $rhs_symbol }
+                ){
+                next RHS_SYMBOL;
+            }
+            $only_terminals_and_productive_non_terminals = 0;
+            last RHS_SYMBOL;
+        }
+        if ($only_terminals_and_productive_non_terminals){
+            $productive_non_terminals->{$lhs}->{$rule_id} = undef;
+            $added_nothing = 0;
+        }
+    }
+    goto FIND_MORE unless $added_nothing;
+
+#    say "Productive non-terminals: ", join ', ', sort keys %$productive_non_terminals;
+
+    my $cleaned = [];
+    for my $rule_id (0..@$pfg-1){
+        my $lhs = $pfg->[ $rule_id ]->[0];
+        next unless exists $productive_non_terminals->{$lhs}->{$rule_id};
+        push @$cleaned, $pfg->[ $rule_id ];
+    }
+#    say Dump $cleaned;
+    $self->{pfg} = $cleaned;
+    # todo: something more sensible with the start symbol
+    $self->{start} = $self->{pfg}->[0]->[0];
+    $self->{pfg_index} = $self->build_index;
 }
 
 sub prune{
@@ -226,7 +275,7 @@ sub prune{
         }
     });
 
-    say "rules to prune: ", join ', ', map { "R$_" } keys %rules_to_prune;
+#    say "rules to prune: ", join ', ', map { "R$_" } keys %rules_to_prune;
 
     # remove rules to prune
     my @new_pfg;
@@ -237,8 +286,7 @@ sub prune{
     # rebuild index
     $self->{pfg_index} = $self->build_index($pfg);
 
-    # remove symbols inaccessible from the top
-#        $self->prune_rule( $rule_id );
+#    $self->cleanup;
 
 #    say "# pfg rules after pruning\n", $self->show_rules;
 #    say "# pfg index after pruning", Dump $pfg_index;
@@ -270,14 +318,25 @@ sub enumerate{
     }
 }
 
+sub do_traverse{
+    my ($self, $rule_id, $traverser) = @_;
+    my ($lhs, @rhs) = @{ $self->{pfg}->[ $rule_id ] };
+    $traverser->($self, $rule_id, $lhs, \@rhs);
+    for my $rhs_symbol (@rhs){
+        if ( not $self->is_terminal( $rhs_symbol ) ){
+            $self->do_traverse( $self->rule_id( $rhs_symbol ), $traverser );
+        }
+        else{
+            $traverser->($self, $rule_id, $rhs_symbol);
+        }
+    }
+}
 
 sub traverse{
-    my ($pfg, $enumerator) = @_;
-    for my $i (0..@$pfg-1){
-        my $rule = $pfg->[$i];
-        my ($lhs, @rhs) = @$rule;
-        $enumerator->( $i, $lhs, \@rhs );
-    }
+    my ($self, $traverser) = @_;
+    my $pfg = $self->{pfg};
+    my $start_rule_id = $self->rule_id( $self->{start} );
+    return $self->do_traverse( $start_rule_id, $traverser );
 }
 
 sub rule_to_ast_node{
