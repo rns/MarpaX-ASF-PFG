@@ -125,20 +125,17 @@ sub new {
 
     # delete duplicate rules
     my %rules;
-    my @unique_rules;
+    my @rules;
     for my $i (0..@$pfg-1){
         my $rule = $pfg->[$i];
         my ($lhs, @rhs) = @$rule;
         my $rule_shown = join ' ', $lhs, '::=', @rhs;
 #        say "Rule: $rule_shown";
-        push @unique_rules, $rule unless exists $rules{$rule_shown};
+        push @rules, [ $lhs, \@rhs ] unless exists $rules{$rule_shown};
         $rules{$rule_shown} = undef;
     }
-    $self->{pfg} = \@unique_rules;
-
-    my $pfg_index = $self->build_index;
-#    say "# pfg index ", Dump $pfg_index;
-    $self->{pfg_index} = $pfg_index;
+    $self->{pfg} = \@rules;
+    $self->{pfg_index} = $self->build_index;
 
     return $self;
 }
@@ -217,21 +214,21 @@ sub cleanup{
             $productive_non_terminals->{$lhs}->{$rule_id} = undef;
         }
     }
-#   say "Productive non-terminals: ", join ', ', sort keys %$productive_non_terminals;
+#    say "Productive non-terminals: ", join ', ', sort keys %$productive_non_terminals;
 
     # find rules that use only terminals and productive non-terminals
 FIND_MORE:
-    my $added_nothing = 1;
+    my $added_something = 0;
 RULE:
     for my $rule_id (0..@$pfg-1){
         my ($lhs, @rhs) = @{ $pfg->[ $rule_id ] };
         # skip what we know is productive
         next RULE if exists $productive_non_terminals->{$lhs};
         my $only_terminals_and_productive_non_terminals = 1;
-#        say "checking rule $rule_id: $lhs";
+#        say "# checking R$rule_id: $lhs";
 RHS_SYMBOL:
         for my $rhs_symbol (@rhs){
-#            say "checking RHS symbol: $rhs_symbol";
+#            say "  checking RHS symbol: $rhs_symbol";
             # check if $rhs_symbol is a terminal
             # or productive non-terminal
             if (   $self->is_terminal( $rhs_symbol )
@@ -243,13 +240,15 @@ RHS_SYMBOL:
             last RHS_SYMBOL;
         }
         if ($only_terminals_and_productive_non_terminals){
+#            say "  R$rule_id $lhs is productive";
             $productive_non_terminals->{$lhs}->{$rule_id} = undef;
-            $added_nothing = 0;
+            $added_something = 1;
         }
     }
-    goto FIND_MORE unless $added_nothing;
+#    say "\n# Productive non-terminals:\n", join ', ', sort keys %$productive_non_terminals;
+    goto FIND_MORE if $added_something;
 
-#    say "Productive non-terminals: ", join ', ', sort keys %$productive_non_terminals;
+#    say "\n# Final productive non-terminals:\n", join ', ', sort keys %$productive_non_terminals;
 
     my $cleaned = [];
     for my $rule_id (0..@$pfg-1){
@@ -268,9 +267,6 @@ sub prune{
     my ($self, $pruner) = @_;
     my $pfg = $self->{pfg};
 
-    say "# PFG before pruning\n", $self->show_rules;
-    say $self->start;
-
     # traverse $pfg calling $pruner for each rule and marking
     # the rule for deletion if $pruner returns 1
     my %rules_to_prune;
@@ -281,26 +277,36 @@ sub prune{
         }
     });
 
-#    say "rules to prune: ", join ', ', map { "R$_" } keys %rules_to_prune;
+    # todo: check if all start rules will be pruned
+    say "rules to prune: ", join ', ', map { "R$_" } keys %rules_to_prune;
 
     # remove rules to prune
-    my @new_pfg;
+    my @pruned_pfg;
     for my $rule_id (0..@$pfg-1){
-        push @new_pfg, $pfg->[$rule_id] unless exists $rules_to_prune{$rule_id};
+        push @pruned_pfg, $pfg->[$rule_id] unless exists $rules_to_prune{$rule_id};
     }
-    $self->{pfg} = \@new_pfg;
-    # rebuild index
-    $self->{pfg_index} = $self->build_index($pfg);
+    $self->{pfg} = \@pruned_pfg;
 
-    say "# PFG after pruning\n", $self->show_rules;
-    say $self->start;
-
-    $self->cleanup;
-
-    say "# PFG after cleanup\n", $self->show_rules;
-    say $self->start;
-
-#    say "# pfg index after pruning", Dump $pfg_index;
+    # cleanup the grammar using Marpa NAIF
+    my $grammar = Marpa::R2::Grammar->new({
+        start => $self->{start},
+        rules => $self->{pfg},
+        unproductive_ok => 1,
+        inaccessible_ok => 1,
+    });
+    $grammar->precompute();
+    my $rules = $grammar->show_rules;
+    say $rules;
+    my @cleaned_pfg;
+    for my $rule (grep {!/unproductive|inaccessible/} split /\n/m, $rules){
+#        say $rule;
+        my (undef, $lhs, @rhs) = split /^\d+:\s+|\s+->\s+|\s+/, $rule;
+        say $lhs, ' -> ', join ' ', @rhs;
+        push @cleaned_pfg, [ $lhs, \@rhs ];
+    }
+    # save and rebuild index
+    $self->{pfg} = \@cleaned_pfg;
+    $self->{pfg_index} = $self->build_index;
 }
 
 sub show_rule{
@@ -324,8 +330,8 @@ sub enumerate{
     my $pfg = $self->{pfg};
     for my $i (0..@$pfg-1){
         my $rule = $pfg->[$i];
-        my ($lhs, @rhs) = @$rule;
-        $enumerator->( $i, $lhs, \@rhs );
+        my ($lhs, $rhs) = @$rule;
+        $enumerator->( $i, $lhs, $rhs );
     }
 }
 
@@ -353,9 +359,9 @@ sub traverse{
 sub rule_to_ast_node{
     my ($self, $rule_id) = @_;
 
-    my ($pfg_lhs, @pfg_rhs) = @{ $self->{pfg}->[ $rule_id ] };
+    my ($pfg_lhs, $pfg_rhs) = @{ $self->{pfg}->[ $rule_id ] };
 
-    say "# Rule $rule_id:\n", $self->show_rule( $rule_id, $pfg_lhs, \@pfg_rhs);
+#    say "# Rule $rule_id:\n", $self->show_rule( $rule_id, $pfg_lhs, $pfg_rhs);
 
     # get ast node_id, start, length
     my @ast_lhs = split /_/, $pfg_lhs;
@@ -382,7 +388,7 @@ sub rule_to_ast_node{
 #                say "terminal $pfg_rhs_symbol";
                 $pfg_rhs_symbol;
             }
-        } @pfg_rhs
+        } @$pfg_rhs
     ];
 }
 

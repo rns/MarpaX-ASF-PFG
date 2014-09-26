@@ -61,7 +61,7 @@ die 'No ASF' if not defined $asf;
 my $pfg = MarpaX::ASF::PFG->new($asf);
 isa_ok $pfg, 'MarpaX::ASF::PFG', 'pfg';
 
-#say "# before pruning:\n", $pfg->show_rules;
+say "# before pruning:\n", $pfg->show_rules;
 
 # prune PFG to get the right AST
 # G&J 3.7.3.2 Retrieving Parse Trees from a Parse Forest:

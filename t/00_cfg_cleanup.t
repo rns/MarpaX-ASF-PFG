@@ -27,55 +27,84 @@ use MarpaX::ASF::PFG;
 
 my $grammars = [
     [
-        [qw{    S   A B      }],
-        [qw{    S   D E      }],
-        [qw{    A   a        }],
-        [qw{    B   b C      }],
-        [qw{    C   c        }],
-        [qw{    D   d F      }],
-        [qw{    E   e        }],
-        [qw{    F   f D      }]
+        [ 'S', [qw{ A B }] ],
+        [ 'S', [qw{ D E }] ],
+        [ 'A', [qw{ a   }] ],
+        [ 'B', [qw{ b C }] ],
+        [ 'C', [qw{ c   }] ],
+        [ 'D', [qw{ d F }] ],
+        [ 'E', [qw{ e   }] ],
+        [ 'F', [qw{ f D }] ],
     ],
     [
-        [qw{    Sum_2_3     Sum_2_1 + Sum_4_1       }],
-        [qw{    Sum_0_5     Sum_0_3 + Sum_4_1       }],
-        [qw{    Sum_4_1     Digit_4_1               }],
-        [qw{    Digit_4_1   1                       }],
-        [qw{    Sum_0_3     Sum_0_1 + Sum_2_1       }],
-        [qw{    Sum_2_1     Digit_2_1               }],
-        [qw{    Digit_2_1   5                       }],
-        [qw{    Sum_0_1     Digit_0_1               }],
-        [qw{    Digit_0_1   3                       }]
+        [ 'Sum_2_3',    [qw{ Sum_2_1 + Sum_4_1  }] ],
+        [ 'Sum_0_5',    [qw{ Sum_0_3 + Sum_4_1  }] ],
+        [ 'Sum_4_1',    [qw{ Digit_4_1          }] ],
+        [ 'Digit_4_1',  [qw{ 1                  }] ],
+        [ 'Sum_0_3',    [qw{ Sum_0_1 + Sum_2_1  }] ],
+        [ 'Sum_2_1',    [qw{ Digit_2_1          }] ],
+        [ 'Digit_2_1',  [qw{ 5                  }] ],
+        [ 'Sum_0_1',    [qw{ Digit_0_1          }] ],
+        [ 'Digit_0_1',  [qw{ 3                  }] ],
     ],
     [
-        [qw{    S0  S   }],
-        [qw{    S0  X   }],
-        [qw{    S0  Z   }],
-        [qw{    S   A   }],
-        [qw{    A   B   }],
-        [qw{    B   C   }],
-        [qw{    C   A a }],
-        [qw{    X   C   }],
-        [qw{    Y   a Y }],
-        [qw{    Y   a   }],
-        [qw{    Z       }]
+        [ 'S0', [qw{ S   }] ],
+        [ 'S0', [qw{ X   }] ],
+        [ 'S0', [qw{ Z   }] ],
+        [ 'S',  [qw{ A   }] ],
+        [ 'A',  [qw{ B   }] ],
+        [ 'B',  [qw{ C   }] ],
+        [ 'C',  [qw{ A a }] ],
+        [ 'X',  [qw{ C   }] ],
+        [ 'Y',  [qw{ a Y }] ],
+        [ 'Y',  [qw{ a   }] ],
+        [ 'Z',  [qw{     }] ],
     ],
-
+    [
+        [ 'S', [qw{ B b }] ],
+        [ 'S', [qw{ C c }] ],
+        [ 'S', [qw{ E e }] ],
+        [ 'B', [qw{ B b }] ],
+        [ 'B', [qw{ b   }] ],
+        [ 'C', [qw{ C c }] ],
+        [ 'C', [qw{ c   }] ],
+        [ 'D', [qw{ B d }] ],
+        [ 'D', [qw{ C d }] ],
+        [ 'D', [qw{ d   }] ],
+        [ 'E', [qw{ E e }] ]
+    ]
 ];
 
-for my $g (@$grammars){
+for my $rules (@$grammars){
 
-    my $pfg = MarpaX::ASF::PFG->new($g);
+    my $grammar = Marpa::R2::Grammar->new({
+        start => $rules->[0]->[0],
+        rules => $rules,
+        unproductive_ok => 1,
+        inaccessible_ok => 1,
+    });
+    $grammar->precompute();
 
-    say $pfg->show_rules;
+    say $grammar->show_rules;
+
+    my $pfg = MarpaX::ASF::PFG->new($rules);
+    say "# Cleaned with cleanup()\n", $pfg->show_rules;
     say $pfg->{start};
-#    say Dump $pfg->{pfg_index};
 
     $pfg->cleanup;
 
-    say $pfg->show_rules;
-    say $pfg->{start};
-#    say Dump $pfg->{pfg_index};
+    # clean using Marpa NAIF
+    my @cleaned_pfg;
+    for my $rule (grep {!/unproductive|inaccessible/} split /\n/m, $grammar->show_rules){
+#        say $rule;
+        my (undef, $lhs, @rhs) = split /^\d+:\s+|\s+->\s+|\s+/, $rule;
+#        say $lhs, ' -> ', join ' ', @rhs;
+        push @cleaned_pfg, [ $lhs, \@rhs ];
+    }
+    my $cleaned_pfg = MarpaX::ASF::PFG->new(\@cleaned_pfg);
+    say "# Cleaned with Marpa\n", $cleaned_pfg->show_rules;
+    say $cleaned_pfg->{start};
+#    is $cleaned_pfg->show_rules, $pfg->show_rules, "cleaned just like Marpa does";
 }
 
 done_testing();

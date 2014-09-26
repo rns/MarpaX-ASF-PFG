@@ -69,7 +69,6 @@ END_OF_SOURCE
 } );
 
 my @input = qw{
-2**7-3*10
 3+5+1
 6/6/6
 6**6**6
@@ -77,7 +76,9 @@ my @input = qw{
 6/6/6
 6**6**6
 42*2+7/3
-42*2+7/3-1
+42*2+7/3-1**5
+2-1+5
+2**7-3*10
 4+5*6+8
 };
 
@@ -97,6 +98,8 @@ for my $input (@input){
     # parse forest grammar (PFG) from abstract syntax forest (ASF)
     my $pfg = MarpaX::ASF::PFG->new( Marpa::R2::ASF->new( { slr => $ar } ) );
 
+    say "# Before pruning:\n", $pfg->show_rules;
+
     # prune PFG to get the right AST
     # + - * and / are left-associative, while ** is right-associative
     $pfg->prune(
@@ -106,15 +109,14 @@ for my $input (@input){
             # its right operand cannot be a non-terminal
             # that has a node any such operator.
             for my $op (qw{ + * - / }){
-                say "\n# checking R$rule_id $lhs for $op";
+#                say "\n# checking R$rule_id $lhs for $op";
                 if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
-                    say "  R$rule_id $lhs has $op";
-#                    for my $op_right (qw{ + * - / }){
-                    for my $op_right ($op){
+#                    say "  R$rule_id $lhs has $op";
+                    for my $op_right (qw{ + * - / }){
                         if (    not $pfg->is_terminal( $rhs->[2] )
                             and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
                             ){
-                            say "  R$rule_id $lhs needs pruning because $rhs->[2] has $op_right";
+                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_right";
                             return 1;
                         }
                     }
@@ -124,13 +126,13 @@ for my $input (@input){
             # for each rule that has a ** operator,
             # its left operand cannot be a non-terminal
             # that has a node with the same operator.
-            say "# checking R$rule_id $lhs for **";
+#            say "# checking R$rule_id $lhs for **";
             if ( $pfg->has_symbol_at ( $rule_id, '**', 1 ) ){
-                say "  R$rule_id $lhs has **";
+#                say "  R$rule_id $lhs has **";
                 if ( not $pfg->is_terminal( $rhs->[0] )
                     and     $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), '**', 1 )
                     ){
-                    say "Needs pruning";
+                    say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has **";
                     return 1;
                 }
             }
@@ -138,6 +140,7 @@ for my $input (@input){
             return 0;
         }
     );
+    say "# After pruning:\n", $pfg->show_rules;
 
     # AST from pruned PFG
     my $ast = $pfg->ast;
@@ -145,24 +148,6 @@ for my $input (@input){
 
     is_deeply $ast, $expected_ast, $input;
 
-    say "got     : " . ast_evaluate($ast);
-    say "expected: " . ast_evaluate($expected_ast);
-    is ast_evaluate($ast), ast_evaluate($expected_ast), "tree evaluation";
-}
-
-sub ast_evaluate{
-    my ($ast) = @_;
-    if (@$ast == 4){
-        my ($e1, $op, $e2) = @$ast[1..3];
-        if    ($op eq '+'){ ast_evaluate($e1) + ast_evaluate($e2) }
-        elsif ($op eq '-'){ ast_evaluate($e1) - ast_evaluate($e2) }
-        elsif ($op eq '*'){ ast_evaluate($e1) * ast_evaluate($e2) }
-        elsif ($op eq '/'){ ast_evaluate($e1) / ast_evaluate($e2) }
-        elsif ($op eq '**'){ ast_evaluate($e1) ** ast_evaluate($e2) }
-    }
-    else{
-        return $ast->[1]->[1];
-    }
 }
 
 done_testing();
