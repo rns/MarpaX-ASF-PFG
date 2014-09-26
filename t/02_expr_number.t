@@ -101,24 +101,37 @@ for my $input (@input){
     say "# Before pruning:\n", $pfg->show_rules;
 
     # prune PFG to get the right AST
-    # + - * and / are left-associative, while ** is right-associative
+
+=pod criterion design
+# + operator is left-associative, which means that a+b+c should be parsed as
+# ((a+b)+c) rather than as (a+(b+c)).
+
+# The criterion would then be that for each node that has a + operator,
+# its right operand cannot be a non-terminal that has a node with a + operator.
+
+    # + - * and / are left-associative
+    # ** is right-associative
+    # + - have higher precedence than * and /
+    # ** have higher precedence than + - * and /
+    # () have higher precedence than ** -- highest precedence
+
+# a+b+c
+=cut
+
     $pfg->prune(
         sub { # return 1 if the rule needs to be pruned, 0 otherwise
             my ($rule_id, $lhs, $rhs) = @_;
             # for each rule that has a + - * / operator,
             # its right operand cannot be a non-terminal
-            # that has a node any such operator.
+            # that has a node the same operator.
             for my $op (qw{ + * - / }){
 #                say "\n# checking R$rule_id $lhs for $op";
                 if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
-#                    say "  R$rule_id $lhs has $op";
-                    for my $op_right (qw{ + * - / }){
-                        if (    not $pfg->is_terminal( $rhs->[2] )
-                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
-                            ){
-                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_right";
-                            return 1;
-                        }
+                    if (    not $pfg->is_terminal( $rhs->[2] )
+                        and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op, 1 )
+                        ){
+                        say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op";
+                        return 1;
                     }
                 }
             }

@@ -176,90 +176,29 @@ sub build_index{
     return $pfg_index;
 }
 
-=pod Formal algorithm for finding productive non-terminals
-
-    1. Create a set of all the non-terminals that have just
-    terminal symbols or empty strings on the right-hand side (RHS): A1
-
-    2. Add to A1 the non-terminals that have on the RHS non-terminals
-    from A1 concatenated to terminal symbols: A2
-
-    3. Repeat step 2 until no more non-terminals are added to the set:
-    Ai+1 = Ai
-
-    4. The resulting set Ak consists of all productive nonterminals
-    (those non-terminals that generate strings)
-
-=cut
-
 sub cleanup{
     my ($self) = @_;
     my $pfg = $self->{pfg};
-    my $pfg_index = $self->{pfg_index};
 
-    # find productive non-terminals
-    my $productive_non_terminals = {};
-    for my $rule_id (0..@$pfg-1){
-        my ($lhs, @rhs) = @{ $pfg->[ $rule_id ] };
-        # todo: check for empty rhs
-        # todo: check for multiple rhs
-        my $all_terminals = 1;
-        for my $rhs_symbol (@rhs){
-            if ( not $self->is_terminal( $rhs_symbol ) ){
-                $all_terminals = 0;
-                last;
-            }
-        }
-        if ($all_terminals){
-            $productive_non_terminals->{$lhs}->{$rule_id} = undef;
-        }
+    # cleanup the grammar using Marpa NAIF
+    my $grammar = Marpa::R2::Grammar->new({
+        start => $self->{start},
+        rules => $self->{pfg},
+        unproductive_ok => 1,
+        inaccessible_ok => 1,
+    });
+    $grammar->precompute();
+    my $rules = $grammar->show_rules;
+    say $rules;
+    my @cleaned_pfg;
+    for my $rule (grep {!/unproductive|inaccessible/} split /\n/m, $rules){
+#        say $rule;
+        my (undef, $lhs, @rhs) = split /^\d+:\s+|\s+->\s+|\s+/, $rule;
+        say $lhs, ' -> ', join ' ', @rhs;
+        push @cleaned_pfg, [ $lhs, \@rhs ];
     }
-#    say "Productive non-terminals: ", join ', ', sort keys %$productive_non_terminals;
-
-    # find rules that use only terminals and productive non-terminals
-FIND_MORE:
-    my $added_something = 0;
-RULE:
-    for my $rule_id (0..@$pfg-1){
-        my ($lhs, @rhs) = @{ $pfg->[ $rule_id ] };
-        # skip what we know is productive
-        next RULE if exists $productive_non_terminals->{$lhs};
-        my $only_terminals_and_productive_non_terminals = 1;
-#        say "# checking R$rule_id: $lhs";
-RHS_SYMBOL:
-        for my $rhs_symbol (@rhs){
-#            say "  checking RHS symbol: $rhs_symbol";
-            # check if $rhs_symbol is a terminal
-            # or productive non-terminal
-            if (   $self->is_terminal( $rhs_symbol )
-                or exists $productive_non_terminals->{ $rhs_symbol }
-                ){
-                next RHS_SYMBOL;
-            }
-            $only_terminals_and_productive_non_terminals = 0;
-            last RHS_SYMBOL;
-        }
-        if ($only_terminals_and_productive_non_terminals){
-#            say "  R$rule_id $lhs is productive";
-            $productive_non_terminals->{$lhs}->{$rule_id} = undef;
-            $added_something = 1;
-        }
-    }
-#    say "\n# Productive non-terminals:\n", join ', ', sort keys %$productive_non_terminals;
-    goto FIND_MORE if $added_something;
-
-#    say "\n# Final productive non-terminals:\n", join ', ', sort keys %$productive_non_terminals;
-
-    my $cleaned = [];
-    for my $rule_id (0..@$pfg-1){
-        my $lhs = $pfg->[ $rule_id ]->[0];
-        next unless exists $productive_non_terminals->{$lhs}->{$rule_id};
-        push @$cleaned, $pfg->[ $rule_id ];
-    }
-#    say Dump $cleaned;
-    $self->{pfg} = $cleaned;
-    # todo: something more sensible with the start symbol
-#    $self->{start} = $self->{pfg}->[0]->[0];
+    # save and rebuild index
+    $self->{pfg} = \@cleaned_pfg;
     $self->{pfg_index} = $self->build_index;
 }
 
@@ -287,26 +226,7 @@ sub prune{
     }
     $self->{pfg} = \@pruned_pfg;
 
-    # cleanup the grammar using Marpa NAIF
-    my $grammar = Marpa::R2::Grammar->new({
-        start => $self->{start},
-        rules => $self->{pfg},
-        unproductive_ok => 1,
-        inaccessible_ok => 1,
-    });
-    $grammar->precompute();
-    my $rules = $grammar->show_rules;
-    say $rules;
-    my @cleaned_pfg;
-    for my $rule (grep {!/unproductive|inaccessible/} split /\n/m, $rules){
-#        say $rule;
-        my (undef, $lhs, @rhs) = split /^\d+:\s+|\s+->\s+|\s+/, $rule;
-        say $lhs, ' -> ', join ' ', @rhs;
-        push @cleaned_pfg, [ $lhs, \@rhs ];
-    }
-    # save and rebuild index
-    $self->{pfg} = \@cleaned_pfg;
-    $self->{pfg_index} = $self->build_index;
+    $self->cleanup;
 }
 
 sub show_rule{
