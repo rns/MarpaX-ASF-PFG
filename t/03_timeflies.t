@@ -19,8 +19,8 @@ my $g = Marpa::R2::Scanless::G->new(
     {
         source => \(<<'END_OF_SOURCE'),
 
-:default ::= action => [ name, start, length, values ]
-lexeme default = action => [ name, start, length, value ]
+:default ::= action => [ name, values ]
+lexeme default = action => [ name, value ]
 
 P   ::= S+
 
