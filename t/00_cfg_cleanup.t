@@ -23,7 +23,7 @@ use Marpa::R2;
 
 use YAML;
 
-use MarpaX::ASF::PFG;
+use_ok 'MarpaX::ASF::PFG';
 
 my $grammars = [
     [
