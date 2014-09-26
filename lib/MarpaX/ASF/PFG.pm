@@ -189,12 +189,12 @@ sub cleanup{
     });
     $grammar->precompute();
     my $rules = $grammar->show_rules;
-    say $rules;
+#    say $rules;
     my @cleaned_pfg;
     for my $rule (grep {!/unproductive|inaccessible/} split /\n/m, $rules){
 #        say $rule;
         my (undef, $lhs, @rhs) = split /^\d+:\s+|\s+->\s+|\s+/, $rule;
-        say $lhs, ' -> ', join ' ', @rhs;
+#        say $lhs, ' -> ', join ' ', @rhs;
         push @cleaned_pfg, [ $lhs, \@rhs ];
     }
     # save and rebuild index
@@ -217,7 +217,7 @@ sub prune{
     });
 
     # todo: check if all start rules will be pruned
-    say "rules to prune: ", join ', ', map { "R$_" } keys %rules_to_prune;
+#    say "rules to prune: ", join ', ', map { "R$_" } keys %rules_to_prune;
 
     # remove rules to prune
     my @pruned_pfg;

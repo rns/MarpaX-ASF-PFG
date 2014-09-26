@@ -87,10 +87,9 @@ my @input = qw{
 # the results must be the same
 for my $input (@input){
 
-    diag $input;
     # unambiguous grammar
     my $expected_ast = ${ $ug->parse( \$input ) };
-    say "# expected ast ", Dump $expected_ast;
+#    say "# expected ast ", Dump $expected_ast;
 
     # parse with Ambiguous G & R
     my $ar = Marpa::R2::Scanless::R->new( { grammar => $ag } );
@@ -99,7 +98,7 @@ for my $input (@input){
     # parse forest grammar (PFG) from abstract syntax forest (ASF)
     my $pfg = MarpaX::ASF::PFG->new( Marpa::R2::ASF->new( { slr => $ar } ) );
 
-    say "# Before pruning:\n", $pfg->show_rules;
+#    say "# Before pruning:\n", $pfg->show_rules;
 
     # prune PFG to get the right AST
 
@@ -163,11 +162,11 @@ cannot be a non-terminal that has a node with a + - * / operator.
             return 0;
         }
     );
-    say "# After pruning:\n", $pfg->show_rules;
+#    say "# After pruning:\n", $pfg->show_rules;
 
     # AST from pruned PFG
     my $ast = $pfg->ast;
-    use YAML; say Dump $ast;
+#    use YAML; say Dump $ast;
 
     is_deeply $ast, $expected_ast, $input;
 
@@ -221,19 +220,19 @@ sub assoc_right{
 sub prec{
     my ($pfg, $rule_id, $lhs, $rhs, $ops_higher, $ops_lower) = @_;
     for my $op_higher (@$ops_higher){
-        say "\n# checking R$rule_id $lhs for higher precedence of * and / over + and -";
+#        say "\n# checking R$rule_id $lhs for higher precedence of * and / over + and -";
         if ( $pfg->has_symbol_at ( $rule_id, $op_higher, 1 ) ){
             for my $op_lower (@$ops_lower){
                 if (    not $pfg->is_terminal( $rhs->[2] )
                     and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_lower, 1 )
                     ){
-                    say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_lower";
+#                    say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_lower";
                     return 1;
                 }
                 elsif (    not $pfg->is_terminal( $rhs->[0] )
                     and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), $op_lower, 1 )
                     ){
-                    say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has $op_lower";
+#                    say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has $op_lower";
                     return 1;
                 }
             }
