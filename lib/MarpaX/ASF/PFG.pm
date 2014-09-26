@@ -204,6 +204,8 @@ sub cleanup{
     my $productive_non_terminals = {};
     for my $rule_id (0..@$pfg-1){
         my ($lhs, @rhs) = @{ $pfg->[ $rule_id ] };
+        # todo: check for empty rhs
+        # todo: check for multiple rhs
         my $all_terminals = 1;
         for my $rhs_symbol (@rhs){
             if ( not $self->is_terminal( $rhs_symbol ) ){
@@ -258,13 +260,17 @@ RHS_SYMBOL:
 #    say Dump $cleaned;
     $self->{pfg} = $cleaned;
     # todo: something more sensible with the start symbol
-    $self->{start} = $self->{pfg}->[0]->[0];
+#    $self->{start} = $self->{pfg}->[0]->[0];
     $self->{pfg_index} = $self->build_index;
 }
 
 sub prune{
     my ($self, $pruner) = @_;
     my $pfg = $self->{pfg};
+
+    say "# PFG before pruning\n", $self->show_rules;
+    say $self->start;
+
     # traverse $pfg calling $pruner for each rule and marking
     # the rule for deletion if $pruner returns 1
     my %rules_to_prune;
@@ -286,14 +292,19 @@ sub prune{
     # rebuild index
     $self->{pfg_index} = $self->build_index($pfg);
 
-#    $self->cleanup;
+    say "# PFG after pruning\n", $self->show_rules;
+    say $self->start;
 
-#    say "# pfg rules after pruning\n", $self->show_rules;
+    $self->cleanup;
+
+    say "# PFG after cleanup\n", $self->show_rules;
+    say $self->start;
+
 #    say "# pfg index after pruning", Dump $pfg_index;
 }
 
-sub pfg_show_rule{
-    my ($pfg, $rule_id, $lhs, $rhs) = @_;
+sub show_rule{
+    my ($self, $rule_id, $lhs, $rhs) = @_;
     return "R$rule_id: " . join ' ', $lhs, '::=', @$rhs;
 }
 
@@ -303,7 +314,7 @@ sub show_rules{
     my @lines;
     $self->enumerate( sub {
         my ($rule_id, $lhs, $rhs) = @_;
-        push @lines, pfg_show_rule($pfg, $rule_id, $lhs, $rhs);
+        push @lines, $self->show_rule( $rule_id, $lhs, $rhs);
     });
     return join "\n", @lines;
 }
@@ -344,7 +355,7 @@ sub rule_to_ast_node{
 
     my ($pfg_lhs, @pfg_rhs) = @{ $self->{pfg}->[ $rule_id ] };
 
-#    say "# Rule $rule_id:\n", pfg_show_rule($pfg, $rule_id, $pfg_lhs, \@pfg_rhs);
+    say "# Rule $rule_id:\n", $self->show_rule( $rule_id, $pfg_lhs, \@pfg_rhs);
 
     # get ast node_id, start, length
     my @ast_lhs = split /_/, $pfg_lhs;

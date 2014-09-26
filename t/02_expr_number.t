@@ -16,7 +16,7 @@ use Carp::Always;
 
 use YAML;
 
-use_ok 'MarpaX::ASF::PFG';
+use MarpaX::ASF::PFG;
 
 #
 # Unambiguous grammar to parse expressions on numbers
@@ -28,6 +28,7 @@ lexeme default = action => [ name, value] latm => 1
 
     Expr ::=
           Number
+       || '(' Expr ')'      assoc => group
        || Expr '**' Expr    assoc => right
        || Expr '*' Expr     # left associativity is by default
         | Expr '/' Expr
@@ -51,7 +52,8 @@ my $ag = Marpa::R2::Scanless::G->new( { source => \(<<'END_OF_SOURCE'),
 lexeme default = action => [ name, start, length, value] latm => 1
 
     Expr ::=
-          Number
+         Number
+       | '(' Expr ')'
        | Expr '**' Expr
        | Expr '*' Expr
        | Expr '/' Expr
@@ -94,8 +96,6 @@ for my $input (@input){
 
     # parse forest grammar (PFG) from abstract syntax forest (ASF)
     my $pfg = MarpaX::ASF::PFG->new( Marpa::R2::ASF->new( { slr => $ar } ) );
-    say $pfg->show_rules;
-    say $pfg->start;
 
     # prune PFG to get the right AST
     # + - * and / are left-associative, while ** is right-associative
@@ -104,17 +104,17 @@ for my $input (@input){
             my ($rule_id, $lhs, $rhs) = @_;
             # for each rule that has a + - * / operator,
             # its right operand cannot be a non-terminal
-            # that has a node with the same operator.
+            # that has a node any such operator.
             for my $op (qw{ + * - / }){
-                say "# checking R$rule_id for $op";
+                say "\n# checking R$rule_id $lhs for $op";
                 if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
-                    say "$lhs has $op";
-                    for my $op_right ($op){
+                    say "  R$rule_id $lhs has $op";
 #                    for my $op_right (qw{ + * - / }){
+                    for my $op_right ($op){
                         if (    not $pfg->is_terminal( $rhs->[2] )
                             and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
                             ){
-                            say "Needs pruning because $rhs->[2] has $op_right";
+                            say "  R$rule_id $lhs needs pruning because $rhs->[2] has $op_right";
                             return 1;
                         }
                     }
@@ -124,9 +124,9 @@ for my $input (@input){
             # for each rule that has a ** operator,
             # its left operand cannot be a non-terminal
             # that has a node with the same operator.
-            say "# checking R$rule_id for **";
+            say "# checking R$rule_id $lhs for **";
             if ( $pfg->has_symbol_at ( $rule_id, '**', 1 ) ){
-                say "R$rule_id has **";
+                say "  R$rule_id $lhs has **";
                 if ( not $pfg->is_terminal( $rhs->[0] )
                     and     $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), '**', 1 )
                     ){
@@ -139,16 +139,30 @@ for my $input (@input){
         }
     );
 
-    say "# PFG after pruning:\n", $pfg->show_rules;
-    say $pfg->start;
-
     # AST from pruned PFG
     my $ast = $pfg->ast;
     use YAML; say Dump $ast;
 
     is_deeply $ast, $expected_ast, $input;
+
+    say "got     : " . ast_evaluate($ast);
+    say "expected: " . ast_evaluate($expected_ast);
+    is ast_evaluate($ast), ast_evaluate($expected_ast), "tree evaluation";
 }
 
-
+sub ast_evaluate{
+    my ($ast) = @_;
+    if (@$ast == 4){
+        my ($e1, $op, $e2) = @$ast[1..3];
+        if    ($op eq '+'){ ast_evaluate($e1) + ast_evaluate($e2) }
+        elsif ($op eq '-'){ ast_evaluate($e1) - ast_evaluate($e2) }
+        elsif ($op eq '*'){ ast_evaluate($e1) * ast_evaluate($e2) }
+        elsif ($op eq '/'){ ast_evaluate($e1) / ast_evaluate($e2) }
+        elsif ($op eq '**'){ ast_evaluate($e1) ** ast_evaluate($e2) }
+    }
+    else{
+        return $ast->[1]->[1];
+    }
+}
 
 done_testing();
