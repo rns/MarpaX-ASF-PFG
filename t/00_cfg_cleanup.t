@@ -76,35 +76,10 @@ my $grammars = [
 ];
 
 for my $rules (@$grammars){
-
-    my $grammar = Marpa::R2::Grammar->new({
-        start => $rules->[0]->[0],
-        rules => $rules,
-        unproductive_ok => 1,
-        inaccessible_ok => 1,
-    });
-    $grammar->precompute();
-
-    say $grammar->show_rules;
-
     my $pfg = MarpaX::ASF::PFG->new($rules);
-    say "# Cleaned with cleanup()\n", $pfg->show_rules;
-    say $pfg->{start};
-
+    say "# Source CFG\n", $pfg->show_rules;
     $pfg->cleanup;
-
-    # clean using Marpa NAIF
-    my @cleaned_pfg;
-    for my $rule (grep {!/unproductive|inaccessible/} split /\n/m, $grammar->show_rules){
-#        say $rule;
-        my (undef, $lhs, @rhs) = split /^\d+:\s+|\s+->\s+|\s+/, $rule;
-#        say $lhs, ' -> ', join ' ', @rhs;
-        push @cleaned_pfg, [ $lhs, \@rhs ];
-    }
-    my $cleaned_pfg = MarpaX::ASF::PFG->new(\@cleaned_pfg);
-    say "# Cleaned with Marpa\n", $cleaned_pfg->show_rules;
-    say $cleaned_pfg->{start};
-#    is $cleaned_pfg->show_rules, $pfg->show_rules, "cleaned just like Marpa does";
+    say "# Cleaned CFG\n", $pfg->show_rules, "\n";
 }
 
 done_testing();

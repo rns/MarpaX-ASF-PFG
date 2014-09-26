@@ -14,10 +14,11 @@ sub new {
     my $self = {};
     bless $self, $class;
 
-    # new from array of arrays
+    # new from array of arrays in Marpa NAIF format
     if (ref $asf eq "ARRAY"){
-        $self->{pfg} = $asf;
-        $self->{start} = $asf->[0]->[0];
+        my $rules = $asf;
+        $self->{pfg} = $rules;
+        $self->{start} = $rules->[0]->[0];
         $self->{pfg_index} = $self->build_index;
         return $self;
     }
@@ -56,6 +57,8 @@ sub new {
 
             # save PFG rule unless the literal's symbol is internal
             # which means it has no symbol name in the parse grammar
+            # todo: wrap literals to avoid exceptions thrown by Marpa NAIF
+            # on, e.g. rule name ) ends in ")"
             if ($literal_symbol_name ne ''){
                 # lhs, rhs1, rhs2 ...
                 unshift @$pfg, [ $literal_symbol_name, $literal ];
@@ -285,6 +288,10 @@ sub rule_to_ast_node{
 
     # get ast node_id, start, length
     my @ast_lhs = split /_/, $pfg_lhs;
+    # possible todo: for efficiency use PFG as an attribute grammar
+    # attributes may include start, length and span literal for each symbol/rule
+    # accessible via lhs/rule_id or as a hash ref
+    # [ $lhs, $rhs_aref, $attributes_href ]
     my $length = pop @ast_lhs;
     my $start = pop @ast_lhs;
     my $ast_lhs = join('_', @ast_lhs);
