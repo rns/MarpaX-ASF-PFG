@@ -69,7 +69,7 @@ END_OF_SOURCE
 } );
 
 my @input = qw{
-3+5+1
+3+5+1**10
 6/6/6
 6**6**6
 3+5+1
@@ -103,29 +103,60 @@ for my $input (@input){
     # prune PFG to get the right AST
 
 =pod criterion design
-# + operator is left-associative, which means that a+b+c should be parsed as
-# ((a+b)+c) rather than as (a+(b+c)).
 
-# The criterion would then be that for each node that has a + operator,
-# its right operand cannot be a non-terminal that has a node with a + operator.
++ operator is left-associative, which means that a+b+c should be parsed as
+((a+b)+c) rather than as (a+(b+c)).
 
-    # + - * and / are left-associative
-    # ** is right-associative
-    # + - have higher precedence than * and /
-    # ** have higher precedence than + - * and /
-    # () have higher precedence than ** -- highest precedence
+The criterion would then be that for each node that has a + operator,
+its right operand cannot be a non-terminal that has a node with a + operator.
 
-# a+b+c
+Take into account that the first four operators are left-associative,
+but the exponentiation operator ** is right-associative:
+6/6/6 is ((6/6)/6) but 6 ** 6 ** 6 is (6 ** (6 ** 6)).
+
+    + - * and / are left-associative
+    ** is right-associative
+    + - have higher precedence than * and /
+    ** have higher precedence than + - * and /
+    () have higher precedence than ** -- highest precedence
+
+# left associativity of + - * or /
+a+b+c = ((a+b)+c) != (a+(b+c))
+for each node that has a + - * or / operator, its right operand
+cannot be a non-terminal that has a node with that operator.
+
+# right associativity of **
+6**6**6 = (6**(6**6)) != ((6**6)**6)
+for each node that has a ** operator, its left operand
+cannot be a non-terminal that has a node with ** operator.
+
+# precedence of * and / over + and -
+a+b*c+d = (a+(b*c)+d) != a+b*(c+d) or (a+b)*c+d
+a*b+c = ((a*b)+c) != (a*(b+c))
+for each node that has a * or / operator, its right and left operands
+cannot be a non-terminal that has a node with a + or - operator.
+
+# precedence of ** over + - * and /
+a**b+c = ((a**b)+c) != (a**(b+c))
+for each node that has a ** operator, its right operand
+cannot be a non-terminal that has a node with a + - * / operator.
+
+# precedence of () over ** + - * and /
+
 =cut
 
     $pfg->prune(
         sub { # return 1 if the rule needs to be pruned, 0 otherwise
             my ($rule_id, $lhs, $rhs) = @_;
-            # for each rule that has a + - * / operator,
-            # its right operand cannot be a non-terminal
-            # that has a node the same operator.
+            # left associativity of + - 2-1+5
+            # left associativity of * or /
+
+            # left associativity of + - * or /
+            #   for each rule that has a + - * / operator,
+            #   its right operand cannot be a non-terminal
+            #   that has a node the same operator.
             for my $op (qw{ + * - / }){
-#                say "\n# checking R$rule_id $lhs for $op";
+                say "\n# checking R$rule_id $lhs for left associativity of $op";
                 if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
                     if (    not $pfg->is_terminal( $rhs->[2] )
                         and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op, 1 )
@@ -136,9 +167,10 @@ for my $input (@input){
                 }
             }
 
-            # for each rule that has a ** operator,
-            # its left operand cannot be a non-terminal
-            # that has a node with the same operator.
+            # right associativity of **
+            #   for each rule that has a ** operator,
+            #   its left operand cannot be a non-terminal
+            #   that has a node with the same operator.
 #            say "# checking R$rule_id $lhs for **";
             if ( $pfg->has_symbol_at ( $rule_id, '**', 1 ) ){
 #                say "  R$rule_id $lhs has **";
@@ -147,6 +179,51 @@ for my $input (@input){
                     ){
                     say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has **";
                     return 1;
+                }
+            }
+
+            # precedence of * and / over + and -
+            #   for each node that has a * or / operator,
+            #   its right and left operands cannot be a non-terminal
+            #   that has a node with a + or - operator.
+            for my $op_higher (qw{ * / }){
+                say "\n# checking R$rule_id $lhs for higher precedence of * and / over + and -";
+                if ( $pfg->has_symbol_at ( $rule_id, $op_higher, 1 ) ){
+                    for my $op_lower (qw{ + - }){
+                        if (    not $pfg->is_terminal( $rhs->[2] )
+                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_lower, 1 )
+                            ){
+                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_lower";
+                            return 1;
+                        }
+                        elsif (    not $pfg->is_terminal( $rhs->[0] )
+                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), $op_lower, 1 )
+                            ){
+                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has $op_lower";
+                            return 1;
+                        }
+                    }
+                }
+            }
+
+            # precedence of ** over + - * and /
+            for my $op_higher (qw{ ** }){
+                say "\n# checking R$rule_id $lhs for higher precedence of ** over * / + -";
+                if ( $pfg->has_symbol_at ( $rule_id, $op_higher, 1 ) ){
+                    for my $op_lower (qw{ * / + - }){
+                        if (    not $pfg->is_terminal( $rhs->[2] )
+                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_lower, 1 )
+                            ){
+                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_lower";
+                            return 1;
+                        }
+                        elsif (    not $pfg->is_terminal( $rhs->[0] )
+                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[0] ), $op_lower, 1 )
+                            ){
+                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[0] has $op_lower";
+                            return 1;
+                        }
+                    }
                 }
             }
 
