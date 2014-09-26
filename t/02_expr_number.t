@@ -77,9 +77,10 @@ my @input = qw{
 6**6**6
 42*2+7/3
 42*2+7/3-1**5
-2-1+5
 2**7-3*10
 4+5*6+8
+2-1+5
+2/1*5
 };
 
 # parse input with unambiguous and ambiguous grammars
@@ -148,29 +149,44 @@ cannot be a non-terminal that has a node with a + - * / operator.
     $pfg->prune(
         sub { # return 1 if the rule needs to be pruned, 0 otherwise
             my ($rule_id, $lhs, $rhs) = @_;
-            # left associativity of + - 2-1+5
-            # left associativity of * or /
 
-            # left associativity of + - * or /
-            #   for each rule that has a + - * / operator,
-            #   its right operand cannot be a non-terminal
-            #   that has a node the same operator.
-            for my $op (qw{ + * - / }){
-                say "\n# checking R$rule_id $lhs for left associativity of $op";
+            # left associativity of + and - (2-1+5)
+            # for each node that has a + or - operator, its right operand
+            # cannot be a non-terminal that has a node with that operator.
+            for my $op (qw{ + - }){
                 if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
-                    if (    not $pfg->is_terminal( $rhs->[2] )
-                        and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op, 1 )
-                        ){
-                        say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op";
-                        return 1;
+                    for my $op_right (qw{ + - }){
+                        say "\n# checking R$rule_id $lhs for left associativity $op vs. $op_right";
+                        if (    not $pfg->is_terminal( $rhs->[2] )
+                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
+                            ){
+                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_right";
+                            return 1;
+                        }
+                    }
+                }
+            }
+
+            # left associativity of * and / (2/1*5)
+            # for each node that has a * or / operator, its right operand
+            # cannot be a non-terminal that has a node with that operator.
+            for my $op (qw{ * / }){
+                if ( $pfg->has_symbol_at ( $rule_id, $op, 1 ) ){
+                    for my $op_right (qw{ * / }){
+                        say "\n# checking R$rule_id $lhs for left associativity $op vs. $op_right";
+                        if (    not $pfg->is_terminal( $rhs->[2] )
+                            and $pfg->has_symbol_at ( $pfg->rule_id( $rhs->[2] ), $op_right, 1 )
+                            ){
+                            say "  ", $pfg->show_rule($rule_id, $lhs, $rhs), " needs pruning because $rhs->[2] has $op_right";
+                            return 1;
+                        }
                     }
                 }
             }
 
             # right associativity of **
-            #   for each rule that has a ** operator,
-            #   its left operand cannot be a non-terminal
-            #   that has a node with the same operator.
+            # for each rule that has a ** operator, its left operand
+            # cannot be a non-terminal that has a node with the same operator.
 #            say "# checking R$rule_id $lhs for **";
             if ( $pfg->has_symbol_at ( $rule_id, '**', 1 ) ){
 #                say "  R$rule_id $lhs has **";
@@ -183,9 +199,8 @@ cannot be a non-terminal that has a node with a + - * / operator.
             }
 
             # precedence of * and / over + and -
-            #   for each node that has a * or / operator,
-            #   its right and left operands cannot be a non-terminal
-            #   that has a node with a + or - operator.
+            # for each node that has a * or / operator, its right and left operands
+            # cannot be a non-terminal that has a node with a + or - operator.
             for my $op_higher (qw{ * / }){
                 say "\n# checking R$rule_id $lhs for higher precedence of * and / over + and -";
                 if ( $pfg->has_symbol_at ( $rule_id, $op_higher, 1 ) ){
@@ -239,5 +254,7 @@ cannot be a non-terminal that has a node with a + - * / operator.
     is_deeply $ast, $expected_ast, $input;
 
 }
+
+sub left_assoc
 
 done_testing();
