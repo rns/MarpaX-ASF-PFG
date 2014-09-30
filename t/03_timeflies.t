@@ -15,60 +15,55 @@ use YAML;
 
 use MarpaX::ASF::PFG;
 
-my $g = Marpa::R2::Scanless::G->new(
-    {
-        source => \(<<'END_OF_SOURCE'),
+my $g = Marpa::R2::Scanless::G->new( { source => \(<<'END_OF_SOURCE'),
 
 :default ::= action => [ name, values ]
 lexeme default = action => [ name, value ]
 
-P   ::= S+
+    P   ::= S+
 
-S   ::= NP  VP  period
+    S   ::= NP  VP  period
 
-NP  ::= NN
-    |   JJ  NN
-    |   DT  NN
-    |   NN  NNS
+    NP  ::= NN
+        |   JJ  NN
+        |   DT  NN
+        |   NN  NNS
 
-VP  ::= VBP NP
-    |   VBP PP
-    |   VBZ PP
-    |   VBZ RB
+    VP  ::= VBP NP
+        |   VBP PP
+        |   VBZ PP
+        |   VBZ RB
 
-PP  ::= IN  NP
+    PP  ::= IN  NP
 
-period ~ '.'
+    DT  ~ 'a' | 'an'
+    NN  ~ 'arrow' | 'banana'
+    NNS ~ 'flies'
+    NNS ~ 'bananas'
+    VBZ ~ 'flies'
+    NN  ~ 'fruit':i
+    VBP ~ 'fruit':i
+    IN  ~ 'like'
+    VBP ~ 'like'
+    NN  ~ 'time':i
+    VBP ~ 'time':i
+    RB  ~ 'fast'
+    VBP ~ 'fast'
+    JJ  ~ 'fast'
+    NN  ~ 'fast'
+    VBP ~ 'spoil'
+
+    period ~ '.'
 
 :discard ~ whitespace
 whitespace ~ [\s]+
-
-DT  ~ 'a' | 'an'
-NN  ~ 'arrow' | 'banana'
-NNS ~ 'flies'
-NNS ~ 'bananas'
-VBZ ~ 'flies'
-NN  ~ 'fruit':i
-VBP ~ 'fruit':i
-IN  ~ 'like'
-VBP ~ 'like'
-NN  ~ 'time':i
-VBP ~ 'time':i
-RB  ~ 'fast'
-VBP ~ 'fast'
-JJ  ~ 'fast'
-NN  ~ 'fast'
-VBP ~ 'spoil'
-
 END_OF_SOURCE
-    }
-);
+});
 
 my $expected = <<'EOS';
 [To be written]
 EOS
 
-#
 # these can be used in disambiguation
 # based on non-contiguous segments and morphology
 #
