@@ -27,8 +27,9 @@ sub new {
     $self->{asf} = $asf;
     my $g = $asf->grammar();
 
-    my $pfg = $asf->traverse( [], sub{
-        # This routine converts the glade into a list of elements.  It is called recursively.
+    my $pfg = [];
+    $asf->traverse( $pfg, sub{
+        # This routine converts the glade into PFG rules.  It is called recursively.
         my ($glade, $pfg)     = @_;
 
         my $rule_id     = $glade->rule_id();
@@ -38,8 +39,8 @@ sub new {
         my ( $start, $length ) = $glade->span();
         my $suffix = '_' . $start . '_' . $length;
 
-        # Our result will be a list of PFG rules
-        my @return_value = ();
+        # Our result will be dummy, we will save PFG rules to the scratch pad
+        my $return_value = [];
 
         # A token is a single choice
         # We save PFG rule to the scratch pad and return PFG symbol name
@@ -53,7 +54,6 @@ sub new {
             # don't prepend internal symbol names
             # todo: symbol_is_internal( $symbol_id ) method for SLG
             my $literal_symbol_name = $symbol_name =~ /\[Lex/ ? '' : "$symbol_name$suffix";
-            my $rv = [$literal_symbol_name];
 
             # save PFG rule unless the literal's symbol is internal
             # which means it has no symbol name in the parse grammar
@@ -102,7 +102,7 @@ sub new {
             # is the RHS of a PFG rule, to which we need to add the LHS
             # by PFGizing the current glade's symbol (adding _start_length)
             # and the save the PFG rule to the scratch pad (list of PFG rules).
-            # The list of PFG symbols will be returned to form further PFG rules
+            # The list of PFG symbols will be returned to form further PFG rules.
             # unshift is used to avoid further reverse()ing because
             # the traverse order is depth-first
             my @rv = map {
@@ -114,7 +114,7 @@ sub new {
                 $pfg_symbol
             } @results;
     #        say "# return value: ", Dump \@rv;
-            push @return_value, @rv;
+            push @$return_value, @rv;
 
             # Look at the next alternative in this glade, or end the
             # loop if there is none
@@ -123,7 +123,7 @@ sub new {
         } ## end CHOICE: while (1)
 
         # Return the list of elements for this glade
-        return \@return_value;
+        return $return_value;
     } );
 
     # delete duplicate rules
