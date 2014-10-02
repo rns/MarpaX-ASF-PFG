@@ -46,10 +46,15 @@ my $rv = $pfg->ambiguous(sub{ ($pfg, $literal, $cause, @parses) = @_ ... })
 # and show how differently they are parsed
 for each $token literal $start
     for each $rule literal which also has $start
-    if  there is a sequence of token intervals starting with $token
+    if
+        there is a sequence of token intervals starting with $token
         which covers the entire $rule interval
+        start with first token
+            find next token starting after start+length of the previous token
+
         my @intervals = $tree->fetch_window(rule_interval)
         filter out rule intervals (exists $rules_literals->{start})
+
         if join(' ', @intervals) is part of $token_intervals
             get ambiguous token(s)  # cause(s)
                 no ambiguous token(s) -- no ambiguity, return
@@ -172,13 +177,26 @@ if ( $r->ambiguity_metric() > 1 ) {
 #    say "# attributes: ", Dump $pfg->{pfg_atts};
 
     my $itr = $pfg->{pfg_ints};
+    say '---';
     # 0, 25     26, 42  43, 69  70, 95
-    my $window = $itr->fetch(26, 42);
-    say Dump $window;
-
+    say Dump intervals($itr,0,25);
+    say Dump intervals($itr,0,25);
     # VP_82_12
     say Dump $pfg->ast('VP_82_12');
 
+}
+
+sub intervals{
+    my ($itr, $from, $to) = @_;
+    my @ints;
+    $itr->remove($from, $to, sub{
+        if (    $from <= $_[1] and $_[2] <= $to
+            and not ($_[1] == $from and $_[2] == $to) ){
+            say join ', ', @_;
+            push @ints, [ @_ ];
+        }
+     0 });
+     return \@ints;
 }
 
 done_testing;
