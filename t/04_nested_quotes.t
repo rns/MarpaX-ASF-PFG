@@ -41,7 +41,7 @@ for my $input (@input){
     my $r = Marpa::R2::Scanless::R->new( { grammar => $g } );
     $r->read(\$input);
 
-    # this will need to use to define pruning criterion
+    # this will need to use $pfg->ambiguous() to show ambiguities to define pruning criterion
     #
     # abstract syntax forest (ASF)
     my $asf = Marpa::R2::ASF->new( { slr => $r } );
