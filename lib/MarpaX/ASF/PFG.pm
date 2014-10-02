@@ -8,6 +8,12 @@ use YAML;
 
 use Marpa::R2;
 
+use Set::IntervalTree; # broken on windows
+# use Set::IntervalTree for efficiency
+#   my $results = $tree->fetch_window($low, $high)
+#   Return an arrayref of perl objects whose ranges are completely contained
+#   within the specified range.
+
 sub new {
     my ($class, $asf) = @_;
 
@@ -26,6 +32,9 @@ sub new {
     # new from abstract syntax forest
     $self->{asf} = $asf;
     my $g = $asf->grammar();
+
+    my $ints = Set::IntervalTree->new;
+    my $ints_seen = {};
 
     my $pfg = [];
     $asf->traverse( $pfg, sub{
@@ -58,11 +67,17 @@ sub new {
             # todo: wrap literals to avoid exceptions thrown by Marpa NAIF
             # on, e.g. rule name ) ends in ")"
             if ($literal_symbol_name ne ''){
-                # lhs, rhs1, rhs2 ...
-                unshift @$pfg, [ $literal_symbol_name, $literal, { start => $start, length => $length, literal => $literal } ];
+                # attributes
+                my $atts = { start => $start, length => $length, literal => $literal };
+                # save PFG rule: lhs, rhs1, rhs2 ...
+                unshift @$pfg, [ $literal_symbol_name, $literal, $atts ];
+                # interval
+                $ints->insert( $literal_symbol_name, $start, $start + $length );
                 return [ $literal_symbol_name ];
             }
             else{ # return literal for internal symbols
+                # interval
+                $ints->insert( $literal, $start, $start + $length );
                 return [ $literal ];
             }
         } ## end if ( not defined $rule_id )
@@ -106,8 +121,12 @@ sub new {
             my @rv = map {
     #            say "# return value item", Dump $_;
                 my $pfg_symbol = $symbol_name . $suffix;
+                # attributes
+                my $atts = { start => $start, length => $length, literal => $literal };
                 # save PFG rule
-                unshift @$pfg, [ $pfg_symbol, @{$_}, { start => $start, length => $length, literal => $literal } ];
+                unshift @$pfg, [ $pfg_symbol, @{$_}, $atts ];
+                # interval
+                $ints->insert( $pfg_symbol, $start, $start + $length );
                 # return PFG symbol name
                 $pfg_symbol
             } @results;
@@ -141,6 +160,7 @@ sub new {
     $self->{pfg} = \@rules;
     $self->{pfg_index} = $self->build_index;
     $self->{pfg_atts} = $atts;
+    $self->{pfg_ints} = $ints;
 
     return $self;
 }
