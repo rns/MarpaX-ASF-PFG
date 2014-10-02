@@ -34,12 +34,13 @@ like an arrow
 
 $token_intervals = 'start_end1 start_end2' # sorted by start, search by index()
 %rule_intervals->{start_end} = literal
-interval tree
+interval tree (unique intervals)
 
 # if more than 2 symbol_start_length, ambiguous token or rule literal
 %token_literals->{start} = [ length, symbol_start_length1, symbol_start_length2 ]
 %rules_literals->{start} = [ length, symbol_start_length1, symbol_start_length2 ]
 
+# sub literal_ambiguity
 for each $token literal $start
     for each $rule literal which also has $start
     if  there is a sequence of token intervals starting with $token
@@ -57,7 +58,7 @@ for each $token literal $start
             # to ambiguous tokens
             # but there can be trees of ambiguous literals
 
-Fruit flies like a banana.
+'Fruit flies like a banana.'
 
     (S (NP (NN Fruit))
        (VP (VBZ flies) (PP (IN like) (NP (DT a) (NN banana))))
