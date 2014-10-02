@@ -342,8 +342,9 @@ sub rule_to_ast_node{
 }
 
 sub ast{
-    my ($self) = @_;
-    my $ast = $self->rule_to_ast_node( $self->rule_id( $self->{start} ) );
+    my ($self, $root) = @_;
+    $root //= $self->{start};
+    my $ast = $self->rule_to_ast_node( $self->rule_id( $root ) );
     return $ast;
 }
 

@@ -40,7 +40,10 @@ interval tree (unique intervals)
 %token_literals->{start} = [ length, symbol_start_length1, symbol_start_length2 ]
 %rules_literals->{start} = [ length, symbol_start_length1, symbol_start_length2 ]
 
-# sub literal_ambiguity
+my @ambiguous_items = sub $pfg->ambiguous($code)
+my $rv = $pfg->ambiguous(sub{ ($pfg, $literal, $cause, @parses) = @_ ... })
+# trace all ambiguous literals to ambiguous tokens which caused them
+# and show how differently they are parsed
 for each $token literal $start
     for each $rule literal which also has $start
     if  there is a sequence of token intervals starting with $token
@@ -172,6 +175,8 @@ if ( $r->ambiguity_metric() > 1 ) {
     my $window = $itr->fetch_window(0,10);
     say Dump $window;
 
+    # VP_82_12
+    say Dump $pfg->ast('VP_82_12');
 #    $itr
 }
 
