@@ -179,8 +179,12 @@ if ( $r->ambiguity_metric() > 1 ) {
     my $itr = $pfg->{pfg_ints};
     say '---';
     # 0, 25     26, 42  43, 69  70, 95
+    say Dump intervals($itr,0,10);
     say Dump intervals($itr,0,25);
-    say Dump intervals($itr,0,25);
+    say Dump intervals($itr,26,42);
+    say Dump intervals($itr,43,69);
+    say Dump intervals($itr,70,95);
+
     # VP_82_12
     say Dump $pfg->ast('VP_82_12');
 
@@ -196,7 +200,7 @@ sub intervals{
             push @ints, [ @_ ];
         }
      0 });
-     return \@ints;
+     return [ sort { $a->[1] <=> $b->[1] } @ints ];
 }
 
 done_testing;
