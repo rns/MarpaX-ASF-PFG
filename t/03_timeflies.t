@@ -6,6 +6,7 @@
 =pod
 
 'Time flies like an arrow.'
+
 # parse trees
 (S (NP (NN Time))
    (VP (VBZ flies) (PP (IN like) (NP (DT an) (NN arrow))))
@@ -13,34 +14,38 @@
 (S (NP (NN Time) (NNS flies))
    (VP (VBP like) (NP (DT an) (NN arrow)))
    (period .))
+
 # literal, parse (sub)trees, cause
 time flies
     (NN Time) (VBZ flies)
     (NP (NN Time) (NNS flies))
 (VBZ NNS flies)
+
 # literal, parse (sub)trees, cause
 like an arrow
     (PP (IN like) (NP (DT an) (NN arrow)))
     (VP (VBP like) (NP (DT an) (NN arrow)))
 (IN VPB like)
+
 # Ambiguity markup
 (Time (VBZ NNS flies)) ((IN VPB like) an arrow).
 
 # ambiguity: the same literal is parsed differently at different occurrences
 
 $token_intervals = 'start_end1 start_end2' # sorted by start, search by index()
-%rule intervals->{start_end} = literals
+%rule_intervals->{start_end} = literal
 interval tree
 
-token->{start} = symbol
-%ambiguous_tokens
+# if more than 2 symbol_start_length, ambiguous token or rule literal
+%token_literals->{start} = [ length, symbol_start_length1, symbol_start_length2 ]
+%rules_literals->{start} = [ length, symbol_start_length1, symbol_start_length2 ]
 
 for each $token literal $start
     for each $rule literal which also has $start
-    if there is a sequence of token intervals starting with $token
+    if  there is a sequence of token intervals starting with $token
         which covers the entire $rule interval
         my @intervals = $tree->fetch_window(rule_interval)
-        filter out rule intervals (%rule_intervals)
+        filter out rule intervals (exists $rules_literals->{start})
         if join(' ', @intervals) is part of $token_intervals
             get ambiguous token(s)  # cause(s)
                 no ambiguous token(s) -- no ambiguity, return
