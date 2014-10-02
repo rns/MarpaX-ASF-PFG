@@ -71,6 +71,16 @@ EOS
 # Time also flies fast.
 # Fruit flies can spoil bananas.
 
+# tokens, token spans: literal => start => { parse data }
+# rules, rule spans: literal => start => { parse data }
+# contiguous and non-contiguous morphologically equivalent token spans
+
+# if a token span matches a rule span,
+# it can be shown as a source of ambiguity with appropriate explanations
+
+# if the matching rule span is unambiguous,
+# the tokens in the token span can be disambuguated based on how they are parsed in it
+
 my $paragraph = <<END_OF_PARAGRAPH;
 Time flies like an arrow.
 Time flies fast.
@@ -84,9 +94,9 @@ $r->read( \$paragraph );
 if ( $r->ambiguity_metric() > 1 ) {
 
     # print ASTs
-    while ( defined( my $value_ref = $r->value() ) ) {
-        say Dump ${ $value_ref };
-    }
+#    while ( defined( my $value_ref = $r->value() ) ) {
+#        say Dump ${ $value_ref };
+#    }
 
     # reset the recognizer (we used value() above)
     $r->series_restart();
@@ -100,6 +110,7 @@ if ( $r->ambiguity_metric() > 1 ) {
     isa_ok $pfg, 'MarpaX::ASF::PFG', 'pfg';
 
     say $pfg->show_rules;
+    say "# attributes: ", Dump $pfg->{pfg_atts};
 }
 
 done_testing;

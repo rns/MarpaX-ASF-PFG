@@ -35,6 +35,7 @@ sub new {
         my $rule_id     = $glade->rule_id();
         my $symbol_id   = $glade->symbol_id();
         my $symbol_name = $g->symbol_name($symbol_id);
+        my $literal     = $glade->literal();
 
         my ( $start, $length ) = $glade->span();
         my $suffix = '_' . $start . '_' . $length;
@@ -47,9 +48,6 @@ sub new {
         # unless it is internal to the parse grammar in which case
         # we just return literal
         if ( not defined $rule_id ) {
-            # get and wrap literal
-            #my $literal = "'" . $glade->literal() . "'";
-            my $literal = $glade->literal();
 
             # don't prepend internal symbol names
             # todo: symbol_is_internal( $symbol_id ) method for SLG
@@ -61,7 +59,7 @@ sub new {
             # on, e.g. rule name ) ends in ")"
             if ($literal_symbol_name ne ''){
                 # lhs, rhs1, rhs2 ...
-                unshift @$pfg, [ $literal_symbol_name, $literal ];
+                unshift @$pfg, [ $literal_symbol_name, $literal, { start => $start, length => $length, literal => $literal } ];
                 return [ $literal_symbol_name ];
             }
             else{ # return literal for internal symbols
@@ -109,7 +107,7 @@ sub new {
     #            say "# return value item", Dump $_;
                 my $pfg_symbol = $symbol_name . $suffix;
                 # save PFG rule
-                unshift @$pfg, [ $pfg_symbol, @{$_} ];
+                unshift @$pfg, [ $pfg_symbol, @{$_}, { start => $start, length => $length, literal => $literal } ];
                 # return PFG symbol name
                 $pfg_symbol
             } @results;
@@ -129,9 +127,12 @@ sub new {
     # delete duplicate rules
     my %rules;
     my @rules;
+    my $atts = {};
     for my $i (0..@$pfg-1){
         my $rule = $pfg->[$i];
-        my ($lhs, @rhs) = @$rule;
+        my $att = pop @$rule;
+        my ($lhs, @rhs ) = @$rule;
+        $atts->{$lhs} = $att;
         my $rule_shown = join ' ', $lhs, '::=', @rhs;
 #        say "Rule: $rule_shown";
         push @rules, [ $lhs, \@rhs ] unless exists $rules{$rule_shown};
@@ -139,6 +140,7 @@ sub new {
     }
     $self->{pfg} = \@rules;
     $self->{pfg_index} = $self->build_index;
+    $self->{pfg_atts} = $atts;
 
     return $self;
 }
