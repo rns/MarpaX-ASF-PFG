@@ -169,15 +169,16 @@ if ( $r->ambiguity_metric() > 1 ) {
     isa_ok $pfg, 'MarpaX::ASF::PFG', 'pfg';
 
     say $pfg->show_rules;
-    say "# attributes: ", Dump $pfg->{pfg_atts};
+#    say "# attributes: ", Dump $pfg->{pfg_atts};
 
     my $itr = $pfg->{pfg_ints};
-    my $window = $itr->fetch_window(0,10);
+    # 0, 25     26, 42  43, 69  70, 95
+    my $window = $itr->fetch(26, 42);
     say Dump $window;
 
     # VP_82_12
     say Dump $pfg->ast('VP_82_12');
-#    $itr
+
 }
 
 done_testing;

@@ -36,6 +36,9 @@ sub new {
     my $ints = Set::IntervalTree->new;
     my $ints_seen = {};
 
+    my %token_literals;
+    my %rule_literals;
+
     my $pfg = [];
     $asf->traverse( $pfg, sub{
         # This routine converts the glade into PFG rules.  It is called recursively.
@@ -46,8 +49,14 @@ sub new {
         my $symbol_name = $g->symbol_name($symbol_id);
         my $literal     = $glade->literal();
 
+        # span
         my ( $start, $length ) = $glade->span();
-        my $suffix = '_' . $start . '_' . $length;
+        my $suffix   = '_' . $start . '_' . $length;
+
+        # interval
+        $ints->insert( $literal, $start, $start + $length )
+            unless exists $ints_seen->{ $suffix };
+        $ints_seen->{ $suffix } = $literal;
 
         # Our result will be dummy, we will save PFG rules to the scratch pad
         my $return_value = [];
@@ -71,13 +80,9 @@ sub new {
                 my $atts = { start => $start, length => $length, literal => $literal };
                 # save PFG rule: lhs, rhs1, rhs2 ...
                 unshift @$pfg, [ $literal_symbol_name, $literal, $atts ];
-                # interval
-                $ints->insert( $literal_symbol_name, $start, $start + $length );
                 return [ $literal_symbol_name ];
             }
             else{ # return literal for internal symbols
-                # interval
-                $ints->insert( $literal, $start, $start + $length );
                 return [ $literal ];
             }
         } ## end if ( not defined $rule_id )
@@ -88,9 +93,9 @@ sub new {
             # (PFG symbols or literals), so to produce a new result list,
             # we need to take a Cartesian product of all the choices
             # todo: refactor the below code to a sub
-            my $length = $glade->rh_length();
+            my $rh_length = $glade->rh_length();
             my @results = ( [] );
-            for my $rh_ix ( 0 .. $length - 1 ) {
+            for my $rh_ix ( 0 .. $rh_length - 1 ) {
                 my @new_results = ();
                 for my $old_result (@results) {
                     my $child_value = $glade->rh_value($rh_ix);
@@ -125,8 +130,6 @@ sub new {
                 my $atts = { start => $start, length => $length, literal => $literal };
                 # save PFG rule
                 unshift @$pfg, [ $pfg_symbol, @{$_}, $atts ];
-                # interval
-                $ints->insert( $pfg_symbol, $start, $start + $length );
                 # return PFG symbol name
                 $pfg_symbol
             } @results;
@@ -142,6 +145,8 @@ sub new {
         # Return the list of elements for this glade
         return $return_value;
     } );
+
+    say Dump $ints_seen;
 
     # delete duplicate rules
     my %rules;
@@ -175,6 +180,7 @@ sub is_terminal{
     return not exists $self->{pfg_index}->{$symbol}->{lhs};
 }
 
+# todo: handle the case when lhs is an LHS of several rules, e.g. warn
 sub rule_id{
     my ($self, $lhs) = @_;
     return ( sort { $a <=> $b } keys %{ $self->{pfg_index}->{$lhs}->{lhs} } )[ 0 ];
