@@ -264,8 +264,12 @@ sub ambiguous{
     my ($self, $code) = @_;
     my $token_spans = $self->{token_spans};
     my $rule_spans = $self->{rule_spans};
+    my %tokens_seen;
     # for each token start
+TOKEN_START:
     for my $token_start (sort keys %{ $token_spans }){
+        # check if token is marked as seen and already occurs in a rule
+        next TOKEN_START if exists $tokens_seen{$token_start};
         # for the shortest (with the nearest end position) rule starting at $token_start
 RULE_END:
         for my $rule_end
@@ -279,6 +283,7 @@ RULE_END:
         )
         {
 #            say "# ambiguous token intervals in $token_start-$rule_end (", keys $rule_spans->{$token_start}->{$rule_end}, "): ";
+            # get token intervals within nearest rule range
             my $token_intervals =
             [
                 grep
@@ -289,7 +294,6 @@ RULE_END:
                 @{ $self->intervals( $token_start, $rule_end ) }
             ];
 #            say Dump $token_intervals;
-
             # at least one token must be ambiguous
             my $unambiguous = 1;
             for my $token_interval (@{ $token_intervals }){
@@ -298,10 +302,13 @@ RULE_END:
                 $unambiguous = 0 if keys %{ $token_spans->{$start}->{$end}->{$literal} } > 1;
             }
             next RULE_END if $unambiguous;
-            # by now only ambiguous tokens must remain
+            # by now only ambiguous rule and token intervals must have remained
             say "# ambiguous tokens in $token_start-$rule_end";
             say Dump $rule_spans->{$token_start}->{$rule_end};
             say "# tokens\n", Dump map { $token_spans->{$_->[1]}->{$_->[2]} } @$token_intervals;
+            # mark the tokens as seen to avoid their occurrence in further rules
+            $tokens_seen{$_->[1]} = undef for @$token_intervals;
+            # ...
         }
     }
 }
