@@ -51,7 +51,7 @@ sub new {
 
         # get span
         my ( $start, $length ) = $glade->span();
-        my $suffix   = '_' . $start . '_' . $length;
+        my $suffix   = '_' . $start . '_' . ($start + $length);
 
         # insert interval to tree
         $ints->insert( $literal, $start, $start + $length )
