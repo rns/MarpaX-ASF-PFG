@@ -104,7 +104,6 @@ if ( $r->ambiguity_metric() > 1 ) {
 
     # parse forest grammar
     my $pfg = MarpaX::ASF::PFG->new($asf);
-    isa_ok $pfg, 'MarpaX::ASF::PFG', 'pfg';
 
     say $pfg->show_rules;
 
@@ -117,9 +116,7 @@ if ( $r->ambiguity_metric() > 1 ) {
 #    say Dump $pfg->ast('VP_82_12');
 
     # todo: the below lines must be test for token and rule spans
-    say Dump $pfg->{token_spans};
-    say Dump $pfg->{rule_spans};
-    say Dump $pfg->ambiguous();
+    my $rv = $pfg->ambiguous();
 }
 
 done_testing;

@@ -160,6 +160,9 @@ sub new {
     $self->{token_spans} = \%token_spans;
     $self->{rule_spans} = \%rule_spans;
 
+#    say Dump $self->{token_spans};
+#    say Dump $self->{rule_spans};
+
     # delete duplicate rules
     my %rules;
     my @rules;
@@ -322,7 +325,12 @@ RULE_END:
                 say Dumper $self->ast( $rs );
             }
             # find if ambiguous token symbols exist in rule's ast
-            say Dumper map { $token_spans->{$_->[1]}->{$_->[2]} } @$token_intervals;
+            for my $ti (@$token_intervals){
+                my ($literal, $start, $end) = @$ti;
+                my @token_symbols =
+                    keys %{ $token_spans->{$start}->{$end}->{$literal} };
+                say join "\n", map { Dumper $self->ast($_) } @token_symbols;
+            }
             # mark the tokens as seen to avoid their occurrence in further rules
             $tokens_seen{$_->[1]} = undef for @$token_intervals;
 
