@@ -309,6 +309,7 @@ RULE_END:
             # mark the tokens as seen to avoid their occurrence in further rules
             $tokens_seen{$_->[1]} = undef for @$token_intervals;
             # ...
+            # literal, parse (sub)trees, cause
         }
     }
 }
@@ -322,6 +323,8 @@ sub cleanup{
     my $grammar = Marpa::R2::Grammar->new({
         start => $self->{start},
         rules => $self->{pfg},
+        # todo: boolean args to the below options are undocumented
+        # file issue and try to patch the doc
         unproductive_ok => 1,
         inaccessible_ok => 1,
     });
