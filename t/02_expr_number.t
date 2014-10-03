@@ -96,7 +96,13 @@ for my $input (@input){
     # parse forest grammar (PFG) from abstract syntax forest (ASF)
     my $pfg = MarpaX::ASF::PFG->new( Marpa::R2::ASF->new( { slr => $ar } ) );
 
-#    say "# Before pruning:\n", $pfg->show_rules;
+    say "# Before pruning:\n", $pfg->show_rules;
+
+    # todo: make this a test
+    # this must show nothing because it's the grammar
+    # which is ambiguous rather than input
+    # no token and rule literal is parsed differently
+    $pfg->ambiguous;
 
     # prune PFG to get the right AST
 
@@ -121,7 +127,6 @@ for my $input (@input){
 #    use YAML; say Dump $ast;
 
     is_deeply $ast, $expected_ast, $input;
-
 }
 
 done_testing();

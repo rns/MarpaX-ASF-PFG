@@ -5,31 +5,6 @@
 
 =pod
 
-'Time flies like an arrow.'
-
-# parse trees
-(S (NP (NN Time))
-   (VP (VBZ flies) (PP (IN like) (NP (DT an) (NN arrow))))
-   (period .))
-(S (NP (NN Time) (NNS flies))
-   (VP (VBP like) (NP (DT an) (NN arrow)))
-   (period .))
-
-# literal, parse (sub)trees, cause
-time flies
-    (NN Time) (VBZ flies)
-    (NP (NN Time) (NNS flies))
-(VBZ NNS flies)
-
-# literal, parse (sub)trees, cause
-like an arrow
-    (PP (IN like) (NP (DT an) (NN arrow)))
-    (VP (VBP like) (NP (DT an) (NN arrow)))
-(IN VPB like)
-
-# Ambiguity markup
-(Time (VBZ NNS flies)) ((IN VPB like) an arrow).
-
 # ambiguity: the same literal is parsed differently at different occurrences
 
 'Fruit flies like a banana.'
@@ -134,16 +109,16 @@ if ( $r->ambiguity_metric() > 1 ) {
     say $pfg->show_rules;
 
     # todo: the below loop must be tests probably in a separate file
-    for my $interval ( [0, 25], [ 26, 42 ], [ 43, 69 ], [ 70, 95 ]){
-        say join "\n", map { join ', ', @$_ } @{ $pfg->intervals(  @$interval ) };
-    }
+#    for my $interval ( [0, 25], [ 26, 42 ], [ 43, 69 ], [ 70, 95 ]){
+#        say join "\n", map { join ', ', @$_ } @{ $pfg->intervals(  @$interval ) };
+#    }
 
     # todo: the below line must be test for a parse subtree for symbol
 #    say Dump $pfg->ast('VP_82_12');
 
     # todo: the below lines must be test for token and rule spans
-    say Dump $pfg->{token_spans};
-    say Dump $pfg->{rule_spans};
+#    say Dump $pfg->{token_spans};
+#    say Dump $pfg->{rule_spans};
     say Dump $pfg->ambiguous();
 }
 

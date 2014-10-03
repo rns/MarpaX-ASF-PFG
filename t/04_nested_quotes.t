@@ -49,9 +49,9 @@ for my $input (@input){
 
     # parse-forest grammar (PFG) from ASF
     my $pfg = MarpaX::ASF::PFG->new($asf);
-    isa_ok $pfg, 'MarpaX::ASF::PFG', 'pfg';
 
-    say "# before pruning:\n", $pfg->show_rules;
+#    say "# before pruning:\n", $pfg->show_rules;
+    $pfg->ambiguous();
 }
 
 done_testing();

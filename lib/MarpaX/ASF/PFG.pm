@@ -6,6 +6,11 @@ use warnings;
 
 use YAML;
 
+use Data::Dumper;
+$Data::Dumper::Indent = 0;
+$Data::Dumper::Terse = 1;
+$Data::Dumper::Deepcopy = 1;
+
 use Marpa::R2;
 
 use Set::IntervalTree; # broken on windows
@@ -282,7 +287,12 @@ RULE_END:
             )[0]
         )
         {
-#            say "# ambiguous token intervals in $token_start-$rule_end (", keys $rule_spans->{$token_start}->{$rule_end}, "): ";
+            my $rule_literal = (keys %{ $rule_spans->{$token_start}->{$rule_end} })[0];
+            my @rule_symbols =
+                keys %{ $rule_spans->{$token_start}->{$rule_end}->{$rule_literal} };
+            say "# token intervals in $token_start-$rule_end (", keys $rule_spans->{$token_start}->{$rule_end}, "): ";
+            say "Ambiguous rule" if @rule_symbols > 1;
+            say "  ", join ', ', @rule_symbols;
             # get token intervals within nearest rule range
             my $token_intervals =
             [
@@ -293,7 +303,7 @@ RULE_END:
                 }
                 @{ $self->intervals( $token_start, $rule_end ) }
             ];
-#            say Dump $token_intervals;
+#            say "# token intervals", Dump $token_intervals;
             # at least one token must be ambiguous
             my $unambiguous = 1;
             for my $token_interval (@{ $token_intervals }){
@@ -301,18 +311,67 @@ RULE_END:
 #                say "$literal: ", Dump $token_spans->{$start}->{$end}->{$literal};
                 $unambiguous = 0 if keys %{ $token_spans->{$start}->{$end}->{$literal} } > 1;
             }
-            next RULE_END if $unambiguous;
+            # todo: even if all tokens are unambiguous
+            # we must continue if the rule is ambiguous
+            next RULE_END if $unambiguous and @rule_symbols < 2;
             # by now only ambiguous rule and token intervals must have remained
-            say "# ambiguous tokens in $token_start-$rule_end";
-            say Dump $rule_spans->{$token_start}->{$rule_end};
-            say "# tokens\n", Dump map { $token_spans->{$_->[1]}->{$_->[2]} } @$token_intervals;
+            # and we can find ambiguous literal, parse (sub)trees, cause
+            say "# ambiguous tokens in rule:\n'$rule_literal' ($token_start-$rule_end): ",
+                join ', ', @rule_symbols;
+            for my $rs (@rule_symbols){
+                say Dumper $self->ast( $rs );
+            }
+            # find if ambiguous token symbols exist in rule's ast
+            say Dumper map { $token_spans->{$_->[1]}->{$_->[2]} } @$token_intervals;
             # mark the tokens as seen to avoid their occurrence in further rules
             $tokens_seen{$_->[1]} = undef for @$token_intervals;
-            # ...
-            # literal, parse (sub)trees, cause
+
         }
     }
 }
+
+=pod
+
+# ambiguous tokens in 0-10
+---
+Time flies:
+  NP_0_10: ~
+
+# tokens
+---
+Time:
+  NN_0_4: ~
+---
+flies:
+  NNS_5_10: ~
+  VBZ_5_10: ~
+
+'Time flies like an arrow.'
+
+# parse trees
+(S (NP (NN Time))
+   (VP (VBZ flies) (PP (IN like) (NP (DT an) (NN arrow))))
+   (period .))
+(S (NP (NN Time) (NNS flies))
+   (VP (VBP like) (NP (DT an) (NN arrow)))
+   (period .))
+
+# literal, parse (sub)trees, cause
+time flies
+    (NN Time) (VBZ flies)
+    (NP (NN Time) (NNS flies))
+(VBZ NNS flies)
+
+# literal, parse (sub)trees, cause
+like an arrow
+    (PP (IN like) (NP (DT an) (NN arrow)))
+    (VP (VBP like) (NP (DT an) (NN arrow)))
+(IN VPB like)
+
+# Ambiguity markup
+(Time (VBZ NNS flies)) ((IN VPB like) an arrow).
+
+=cut
 
 # remove unproductive and unaccessible symbols and rules
 sub cleanup{
