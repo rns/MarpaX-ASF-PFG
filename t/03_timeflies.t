@@ -117,8 +117,8 @@ if ( $r->ambiguity_metric() > 1 ) {
 #    say Dump $pfg->ast('VP_82_12');
 
     # todo: the below lines must be test for token and rule spans
-#    say Dump $pfg->{token_spans};
-#    say Dump $pfg->{rule_spans};
+    say Dump $pfg->{token_spans};
+    say Dump $pfg->{rule_spans};
     say Dump $pfg->ambiguous();
 }
 

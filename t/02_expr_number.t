@@ -99,8 +99,9 @@ for my $input (@input){
     say "# Before pruning:\n", $pfg->show_rules;
 
     # todo: make this a test
-    # this must show nothing because it's the grammar
-    # which is ambiguous rather than input
+    # this must show nothing because ambiguity can't be traced to literals
+    # associativity-only ambiguity
+    # it's the grammar which is ambiguous rather than input
     # no token and rule literal is parsed differently
     $pfg->ambiguous;
 

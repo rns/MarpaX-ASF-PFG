@@ -290,9 +290,9 @@ RULE_END:
             my $rule_literal = (keys %{ $rule_spans->{$token_start}->{$rule_end} })[0];
             my @rule_symbols =
                 keys %{ $rule_spans->{$token_start}->{$rule_end}->{$rule_literal} };
-            say "# token intervals in $token_start-$rule_end (", keys $rule_spans->{$token_start}->{$rule_end}, "): ";
-            say "Ambiguous rule" if @rule_symbols > 1;
-            say "  ", join ', ', @rule_symbols;
+#            say "# token intervals in $token_start-$rule_end (", keys $rule_spans->{$token_start}->{$rule_end}, "): ";
+#            say "Ambiguous rule" if @rule_symbols > 1;
+#            say "  ", join ', ', @rule_symbols;
             # get token intervals within nearest rule range
             my $token_intervals =
             [
