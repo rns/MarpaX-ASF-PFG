@@ -37,8 +37,8 @@ $token_intervals = 'start_end1 start_end2' # sorted by start, search by index()
 interval tree (unique intervals)
 
 # if more than 2 symbol_start_length, ambiguous token or rule literal
-%token_literals->{start} = [ length, symbol_start_length1, symbol_start_length2 ]
-%rules_literals->{start} = [ length, symbol_start_length1, symbol_start_length2 ]
+$start->{length}->{symbol_start_length1}
+$start->{length}->{symbol_start_length2}
 
 my @ambiguous_items = sub $pfg->ambiguous($code)
 my $rv = $pfg->ambiguous(sub{ ($pfg, $literal, $cause, @parses) = @_ ... })
@@ -50,7 +50,7 @@ for each $token literal $start
         there is a sequence of token intervals starting with $token
         which covers the entire $rule interval
         start with first token
-            find next token starting after start+length of the previous token
+            find next token starting first after end(start+length) of the previous token
 
         my @intervals = $tree->fetch_window(rule_interval)
         filter out rule intervals (exists $rules_literals->{start})
@@ -176,31 +176,17 @@ if ( $r->ambiguity_metric() > 1 ) {
     say $pfg->show_rules;
 #    say "# attributes: ", Dump $pfg->{pfg_atts};
 
-    my $itr = $pfg->{pfg_ints};
     say '---';
     # 0, 25     26, 42  43, 69  70, 95
-    say Dump intervals($itr,0,10);
-    say Dump intervals($itr,0,25);
-    say Dump intervals($itr,26,42);
-    say Dump intervals($itr,43,69);
-    say Dump intervals($itr,70,95);
+    say Dump $pfg->intervals(  0, 10);
+    say Dump $pfg->intervals(  0, 25);
+    say Dump $pfg->intervals( 26, 42);
+    say Dump $pfg->intervals( 43, 69);
+    say Dump $pfg->intervals( 70, 95);
 
     # VP_82_12
     say Dump $pfg->ast('VP_82_12');
 
-}
-
-sub intervals{
-    my ($itr, $from, $to) = @_;
-    my @ints;
-    $itr->remove($from, $to, sub{
-        if (    $from <= $_[1] and $_[2] <= $to
-            and not ($_[1] == $from and $_[2] == $to) ){
-            say join ', ', @_;
-            push @ints, [ @_ ];
-        }
-     0 });
-     return [ sort { $a->[1] <=> $b->[1] } @ints ];
 }
 
 done_testing;

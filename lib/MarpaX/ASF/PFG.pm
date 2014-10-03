@@ -146,7 +146,7 @@ sub new {
         return $return_value;
     } );
 
-    say Dump $ints_seen;
+#    say Dump $ints_seen;
 
     # delete duplicate rules
     my %rules;
@@ -168,6 +168,23 @@ sub new {
     $self->{pfg_ints} = $ints;
 
     return $self;
+}
+
+# return tokens and their ranges within $from, $to interval
+# sorted by start position
+sub intervals{
+    my ($self, $from, $to) = @_;
+    my $itr = $self->{pfg_ints};
+    my @ints;
+    $itr->remove($from, $to, sub{
+        if (    $from <= $_[1] and $_[2] <= $to
+            and not ($_[1] == $from and $_[2] == $to) ){
+#            say join ', ', @_;
+            push @ints, [ @_ ];
+        }
+        return 0; # don't remove
+     });
+     return [ sort { $a->[1] <=> $b->[1] } @ints ];
 }
 
 sub has_symbol_at{
