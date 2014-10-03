@@ -177,15 +177,14 @@ if ( $r->ambiguity_metric() > 1 ) {
 #    say "# attributes: ", Dump $pfg->{pfg_atts};
 
     say '---';
-    # 0, 25     26, 42  43, 69  70, 95
-    say Dump $pfg->intervals(  0, 10);
-    say Dump $pfg->intervals(  0, 25);
-    say Dump $pfg->intervals( 26, 42);
-    say Dump $pfg->intervals( 43, 69);
-    say Dump $pfg->intervals( 70, 95);
+    # todo: the below loop must be tests
+#    for my $interval ( [0, 25], [ 26, 42 ], [ 43, 69 ], [ 70, 95 ]){
+#        say join "\n", map { join ', ', @$_ } @{ $pfg->intervals(  @$interval ) };
+#    }
 
     # VP_82_12
-    say Dump $pfg->ast('VP_82_12');
+    # todo: the below line must be test
+    # say Dump $pfg->ast('VP_82_12');
 
 }
 
