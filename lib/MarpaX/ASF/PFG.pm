@@ -36,8 +36,8 @@ sub new {
     my $ints = Set::IntervalTree->new;
     my $ints_seen = {};
 
-    my %token_literals;
-    my %rule_literals;
+    my %token_spans;
+    my %rule_spans;
 
     my $pfg = [];
     $asf->traverse( $pfg, sub{
@@ -49,11 +49,11 @@ sub new {
         my $symbol_name = $g->symbol_name($symbol_id);
         my $literal     = $glade->literal();
 
-        # span
+        # get span
         my ( $start, $length ) = $glade->span();
         my $suffix   = '_' . $start . '_' . $length;
 
-        # interval
+        # insert interval to tree
         $ints->insert( $literal, $start, $start + $length )
             unless exists $ints_seen->{ $suffix };
         $ints_seen->{ $suffix } = $literal;
@@ -80,9 +80,11 @@ sub new {
                 my $atts = { start => $start, length => $length, literal => $literal };
                 # save PFG rule: lhs, rhs1, rhs2 ...
                 unshift @$pfg, [ $literal_symbol_name, $literal, $atts ];
+                $token_spans{$start}->{$start+$length}->{$literal}->{$literal_symbol_name} = undef;
                 return [ $literal_symbol_name ];
             }
             else{ # return literal for internal symbols
+                $token_spans{$start}->{$start+$length}->{$literal} = undef;
                 return [ $literal ];
             }
         } ## end if ( not defined $rule_id )
@@ -130,6 +132,8 @@ sub new {
                 my $atts = { start => $start, length => $length, literal => $literal };
                 # save PFG rule
                 unshift @$pfg, [ $pfg_symbol, @{$_}, $atts ];
+                # save rule span
+                $rule_spans{$start}->{$start+$length}->{$literal}->{$pfg_symbol} = undef;
                 # return PFG symbol name
                 $pfg_symbol
             } @results;
@@ -147,6 +151,9 @@ sub new {
     } );
 
 #    say Dump $ints_seen;
+
+    $self->{token_spans} = \%token_spans;
+    $self->{rule_spans} = \%rule_spans;
 
     # delete duplicate rules
     my %rules;
@@ -170,41 +177,6 @@ sub new {
     return $self;
 }
 
-# return tokens and their ranges within $from, $to interval
-# sorted by start position
-sub intervals{
-    my ($self, $from, $to) = @_;
-    my $itr = $self->{pfg_ints};
-    my @ints;
-    $itr->remove($from, $to, sub{
-        if (    $from <= $_[1] and $_[2] <= $to
-            and not ($_[1] == $from and $_[2] == $to) ){
-#            say join ', ', @_;
-            push @ints, [ @_ ];
-        }
-        return 0; # don't remove
-     });
-     return [ sort { $a->[1] <=> $b->[1] } @ints ];
-}
-
-sub has_symbol_at{
-    my ($self, $rule_id, $symbol, $at) = @_;
-    return exists $self->{pfg_index}->{$symbol}->{rhs}->{$at}->{$rule_id};
-}
-
-sub is_terminal{
-    my ($self, $symbol) = @_;
-    return not exists $self->{pfg_index}->{$symbol}->{lhs};
-}
-
-# todo: handle the case when lhs is an LHS of several rules, e.g. warn
-sub rule_id{
-    my ($self, $lhs) = @_;
-    return ( sort { $a <=> $b } keys %{ $self->{pfg_index}->{$lhs}->{lhs} } )[ 0 ];
-}
-
-sub start{ $_[0]->{start} }
-
 sub build_index{
     my ($self) = @_;
 
@@ -224,6 +196,99 @@ sub build_index{
     return $pfg_index;
 }
 
+sub is_terminal{
+    my ($self, $symbol) = @_;
+    return not exists $self->{pfg_index}->{$symbol}->{lhs};
+}
+
+# todo: handle the case when lhs is an LHS of several rules, e.g. warn
+sub rule_id{
+    my ($self, $lhs) = @_;
+    return ( sort { $a <=> $b } keys %{ $self->{pfg_index}->{$lhs}->{lhs} } )[ 0 ];
+}
+
+sub start{ $_[0]->{start} }
+
+sub has_symbol_at{
+    my ($self, $rule_id, $symbol, $at) = @_;
+    return exists $self->{pfg_index}->{$symbol}->{rhs}->{$at}->{$rule_id};
+}
+
+# return tokens and their ranges within $from, $to interval
+# sorted by start position
+sub intervals{
+    my ($self, $from, $to) = @_;
+    my $itr = $self->{pfg_ints};
+    my @ints;
+    $itr->remove($from, $to, sub{
+        if (    $from <= $_[1] and $_[2] <= $to
+            and not ($_[1] == $from and $_[2] == $to) ){
+#            say join ', ', @_;
+            push @ints, [ @_ ];
+        }
+        return 0; # don't remove
+     });
+     return [ sort { $a->[1] <=> $b->[1] } @ints ];
+}
+
+
+# my @ambiguous_items = $pfg->ambiguous();
+# my $rv = $pfg->ambiguous(sub{ ($pfg, $literal, $cause, @parses) = @_ ... });
+# trace all ambiguous literals to ambiguous tokens which caused them
+# and show differences in how they are parsed
+=pod
+for each token literal start
+    for each rule literal which starts at token literal start
+    if
+        there is a sequence of token intervals starting with $token
+        which covers the entire $rule interval
+        start with first token
+            find next token starting first after end(start+length) of the previous token
+
+        my @intervals = $tree->fetch_window(rule_interval)
+        filter out rule intervals (exists $rules_literals->{start})
+
+        if join(' ', @intervals) is part of $token_intervals
+            get ambiguous token(s)  # cause(s)
+                no ambiguous token(s) -- no ambiguity, return
+            get for the rule interval
+                parse (sub)trees    # (NP (NN Time) (NNS flies))
+                token spans         # (NN Time) (VBZ flies)
+
+            # this should trace all ambiguous literals
+            # to ambiguous tokens
+            # but there can be trees of ambiguous literals
+
+=cut
+sub ambiguous{
+    my ($self, $code) = @_;
+    my $token_spans = $self->{token_spans};
+    my $rule_spans = $self->{rule_spans};
+    # for each token start
+    for my $token_start (sort keys %{ $token_spans }){
+        # for the shortest (with the nearest end position) rule starting at $token_start
+        for my $rule_end
+        (
+            (
+                # skip tokens
+                grep { not exists $token_spans->{$token_start}->{$_} }
+                # closest rule end is the least
+                sort keys %{ $rule_spans->{$token_start} }
+            )[0]
+        )
+        {
+            say "# intervals in $token_start-$rule_end (", keys $rule_spans->{$token_start}->{$rule_end}, "): ";
+            my $token_intervals = $self->intervals( $token_start, $rule_end );
+            say Dump $token_intervals;
+            # at least one token must be ambiguous
+            for my $token_interval (@{ $token_intervals }){
+#                return if
+            }
+        }
+    }
+}
+
+# remove unproductive and unaccessible symbols and rules
 sub cleanup{
     my ($self) = @_;
     my $pfg = $self->{pfg};
