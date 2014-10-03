@@ -267,6 +267,7 @@ sub ambiguous{
     # for each token start
     for my $token_start (sort keys %{ $token_spans }){
         # for the shortest (with the nearest end position) rule starting at $token_start
+RULE_END:
         for my $rule_end
         (
             (
@@ -277,13 +278,30 @@ sub ambiguous{
             )[0]
         )
         {
-            say "# intervals in $token_start-$rule_end (", keys $rule_spans->{$token_start}->{$rule_end}, "): ";
-            my $token_intervals = $self->intervals( $token_start, $rule_end );
-            say Dump $token_intervals;
+#            say "# ambiguous token intervals in $token_start-$rule_end (", keys $rule_spans->{$token_start}->{$rule_end}, "): ";
+            my $token_intervals =
+            [
+                grep
+                {
+                    # skip rule intervals
+                    exists $token_spans->{$_->[1]}->{$_->[2]}
+                }
+                @{ $self->intervals( $token_start, $rule_end ) }
+            ];
+#            say Dump $token_intervals;
+
             # at least one token must be ambiguous
+            my $unambiguous = 1;
             for my $token_interval (@{ $token_intervals }){
-#                return if
+                my ($literal, $start, $end) = @$token_interval;
+#                say "$literal: ", Dump $token_spans->{$start}->{$end}->{$literal};
+                $unambiguous = 0 if keys %{ $token_spans->{$start}->{$end}->{$literal} } > 1;
             }
+            next RULE_END if $unambiguous;
+            # by now only ambiguous tokens must remain
+            say "# ambiguous tokens in $token_start-$rule_end";
+            say Dump $rule_spans->{$token_start}->{$rule_end};
+            say "# tokens\n", Dump map { $token_spans->{$_->[1]}->{$_->[2]} } @$token_intervals;
         }
     }
 }
