@@ -160,6 +160,11 @@ sub new {
     $self->{token_spans} = \%token_spans;
     $self->{rule_spans} = \%rule_spans;
 
+    # todo: handle N1 ::= N2 N2 ::= N3 as N1 N2 N3 on the same span
+    # for two symbols s1 and s2 covering the same span
+    # if they are only in s1 ::= s2 rules, then s1 must be deleted
+    # so that the only the top node remain
+
 #    say Dump $self->{token_spans};
 #    say Dump $self->{rule_spans};
 
@@ -314,45 +319,38 @@ RULE_END:
 #                say "$literal: ", Dump $token_spans->{$start}->{$end}->{$literal};
                 $unambiguous = 0 if keys %{ $token_spans->{$start}->{$end}->{$literal} } > 1;
             }
-            # todo: even if all tokens are unambiguous
+            # even if all tokens are unambiguous
             # we must continue if the rule is ambiguous
             next RULE_END if $unambiguous and @rule_symbols < 2;
             # by now only ambiguous rule and token intervals must have remained
             # and we can find ambiguous literal, parse (sub)trees, cause
-            say "# ambiguous tokens in rule:\n'$rule_literal' ($token_start-$rule_end): ",
-                join ', ', @rule_symbols;
+            say "# ambiguous tokens in literal:\n'$rule_literal' ($token_start-$rule_end): ";
             for my $rs (@rule_symbols){
-                say Dumper $self->ast( $rs );
+                say $rs;
+#                say Dumper $self->ast( $rs );
             }
             # find if ambiguous token symbols exist in rule's ast
             for my $ti (@$token_intervals){
                 my ($literal, $start, $end) = @$ti;
                 my @token_symbols =
                     keys %{ $token_spans->{$start}->{$end}->{$literal} };
-                say join "\n", map { Dumper $self->ast($_) } @token_symbols;
+                say join "\n", map { "'$literal' ($start-$end): $_" } @token_symbols;
+#                say join "\n", map { "$start-$end: " . Dumper $self->ast($_) } @token_symbols;
             }
+            # now define literal, parse (sub)trees, and cause
+            # ...
+
+            # todo: renaming (5.3 Lists when the same literal span)
+            # n1 ::= n2 n2 ::= n3 n4 ::= n5 n5 ~ 'n5'
+            # must not be treated as ambiguity
+
             # mark the tokens as seen to avoid their occurrence in further rules
             $tokens_seen{$_->[1]} = undef for @$token_intervals;
-
         }
     }
 }
 
 =pod
-
-# ambiguous tokens in 0-10
----
-Time flies:
-  NP_0_10: ~
-
-# tokens
----
-Time:
-  NN_0_4: ~
----
-flies:
-  NNS_5_10: ~
-  VBZ_5_10: ~
 
 'Time flies like an arrow.'
 
