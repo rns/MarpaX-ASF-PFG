@@ -58,6 +58,8 @@ sub new {
         my ( $start, $length ) = $glade->span();
         my $suffix   = '_' . $start . '_' . ($start + $length);
 
+#        say "$symbol_name '$literal' ($start, $length)";
+
         # insert interval to tree
         $ints->insert( $literal, $start, $start + $length )
             unless exists $ints_seen->{ $suffix };
