@@ -98,13 +98,17 @@ for my $list (@lists){
 #        warn Dumper ${ $v };
         $i++;
     }
-    say "$i parses.";
+    say "# $i parses.";
     $r->series_restart();
+
+# R0: document_0_18 ::= block_0_6 block_6_12 block_12_18
+# R13: document_0_18 ::= block_0_12 block_12_18
 
     if ( $r->ambiguity_metric() > 1 ){
         my $pfg = MarpaX::ASF::PFG->new( Marpa::R2::ASF->new( { slr => $r } ) );
-#        say $pfg->show_rules();
+        say $pfg->show_rules();
         $pfg->ambiguous();
+#        say Dump $pfg->{token_spans};
         say Dump $pfg->{rule_spans};
     }
 }

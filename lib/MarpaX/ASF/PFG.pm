@@ -231,6 +231,10 @@ sub new {
             }
         }
     }
+    # remove start positions where no rules have left
+    while (my ($start, $rules) = each %{ $self->{rule_spans} }){
+        delete $self->{rule_spans}->{$start} unless keys %$rules;
+    }
 
     # reindex, some rules might have been deleted
     $self->{pfg_index} = $self->build_index;
@@ -327,20 +331,23 @@ sub ambiguous{
     my $rule_spans = $self->{rule_spans};
     my %tokens_seen;
 
-    # todo: show non-lexical ambiguity
-    #       e.g. several rules over the same span
-
     # the ambiguity is lexical if at least one token is ambiguous
     my $ambiguity_is_lexical = 0;
     for my $start (keys %{ $token_spans }){
-        if (keys %{ $token_spans->{$start} } ){
+        if ( keys %{ $token_spans->{$start} } > 1 ){
             $ambiguity_is_lexical = 1;
             last;
         }
 
     }
     if ( not $ambiguity_is_lexical ){
+        say "ambiguity is not lexical.";
         return;
+        # todo: show non-lexical ambiguity -- syntactic ambiguity
+        # semantic ambiguity --
+        #       e.g. start with several rule symbols over the same span
+        # see if an rule interval is covered by other rule intervals
+        # sharing the same start
     }
 
     # for each token start
