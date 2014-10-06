@@ -162,11 +162,6 @@ sub new {
     $self->{token_spans} = \%token_spans;
     $self->{rule_spans} = \%rule_spans;
 
-    # todo: handle N1 ::= N2 N2 ::= N3 as N1 N2 N3 on the same span
-    # for two symbols s1 and s2 covering the same span
-    # if they are only in s1 ::= s2 rules, then s1 must be deleted
-    # so that the only the top node remain
-
 #    say Dump $self->{token_spans};
 #    say Dump $self->{rule_spans};
 
@@ -188,6 +183,57 @@ sub new {
     $self->{pfg_index} = $self->build_index;
     $self->{pfg_atts} = $atts;
     $self->{pfg_ints} = $ints;
+
+    # handle s1 ::= s2 s2 ::= s3 as s1 s2 s3 on the same span
+    # for two symbols s1 and s2 covering the same span
+    # if they are only in s1 ::= s2 rules, then s2 must be deleted
+    # so that the only the top node remain
+    # todo: this is very naive and quadratic; some graph voodoo requried
+    #       like: given a set of vertices (s1, s2, s3 ... sn),
+    #             find if a path s1 ::= s2, s2 ::=  s3, s3 ::= ... sn-1 ::= sn exists
+    my $pfgi = $self->{pfg_index};
+    for my $start (keys %{ $self->{rule_spans} }){
+        for my $length ( keys %{ $self->{rule_spans}->{$start} } ){
+            for my $literal (keys %{ $self->{rule_spans}->{$start}->{$length} }){
+                my $rule_symbols = $self->{rule_spans}->{$start}->{$length}->{$literal};
+#                say Dumper $rule_symbols;
+                my @rule_symbols = keys %{ $rule_symbols };
+#                say "# rule symbols:\n", join ", ", @rule_symbols;
+                my @rule_symbols_to_delete;
+                for my $i (0..$#rule_symbols){
+                    for my $j (0..$#rule_symbols){
+                        next if $i == $j;
+                        # check if there is a rule s1 ::= s2
+                        my ($s1, $s2) = @rule_symbols[$i, $j];
+#                        say "# checking for rule $s1 ::= $s2";
+#                        say "$_: ", Dumper $pfgi->{$_} for ($s1, $s2);
+                        if (
+                                exists $pfgi->{$s1}->{lhs}
+                            and exists $pfgi->{$s2}->{rhs}->{0}
+                            and (
+                                (keys %{ $pfgi->{$s1}->{lhs}      })[0]
+                                ==
+                                (keys %{ $pfgi->{$s2}->{rhs}->{0} })[0]
+                            )
+                        ){
+#                            say "  rule exists.";
+                            push @rule_symbols_to_delete, $s2;
+
+                        }
+                    }
+                }
+#                say "# deleting:\n", join ", ", @rule_symbols_to_delete
+#                    if @rule_symbols_to_delete;
+                delete $self->{rule_spans}->{$start}->{$length}->{$literal}->{$_}
+                    for @rule_symbols_to_delete;
+#                say Dumper $self->{rule_spans}->{$start}->{$length}->{$literal}
+#                    if @rule_symbols_to_delete;
+            }
+        }
+    }
+
+    # reindex, some rules might have been deleted
+    $self->{pfg_index} = $self->build_index;
 
     return $self;
 }
