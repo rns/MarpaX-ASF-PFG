@@ -326,6 +326,23 @@ sub ambiguous{
     my $token_spans = $self->{token_spans};
     my $rule_spans = $self->{rule_spans};
     my %tokens_seen;
+
+    # todo: show non-lexical ambiguity
+    #       e.g. several rules over the same span
+
+    # the ambiguity is lexical if at least one token is ambiguous
+    my $ambiguity_is_lexical = 0;
+    for my $start (keys %{ $token_spans }){
+        if (keys %{ $token_spans->{$start} } ){
+            $ambiguity_is_lexical = 1;
+            last;
+        }
+
+    }
+    if ( not $ambiguity_is_lexical ){
+        return;
+    }
+
     # for each token start
 TOKEN_START:
     for my $token_start (sort keys %{ $token_spans }){
@@ -386,11 +403,9 @@ RULE_END:
 #                say join "\n", map { "$start-$end: " . Dumper $self->ast($_) } @token_symbols;
             }
             # now define literal, parse (sub)trees, and cause
+            # and call the code or push to return depending on context
+            # and whether
             # ...
-
-            # todo: renaming (5.3 Lists when the same literal span)
-            # n1 ::= n2 n2 ::= n3 n4 ::= n5 n5 ~ 'n5'
-            # must not be treated as ambiguity
 
             # mark the tokens as seen to avoid their occurrence in further rules
             $tokens_seen{$_->[1]} = undef for @$token_intervals;

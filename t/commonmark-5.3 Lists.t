@@ -11,6 +11,8 @@ $Data::Dumper::Deepcopy = 1;
 
 use Marpa::R2;
 
+use MarpaX::ASF::PFG;
+
 my $g = Marpa::R2::Scanless::G->new( {
         source => \(<<'END_OF_SOURCE'),
 :default ::= action => [ name, value ]
@@ -25,9 +27,6 @@ lexeme default = action => [ name, value ] latm => 1
     # 5 Container blocks
     container_block ::= list
 
-    # 5.1 Block quotes
-
-    # 5.2 List items
     # 5.3 Lists
     list ::= ordered_list
     list ::= bullet_list
@@ -96,18 +95,16 @@ for my $list (@lists){
 
     my $i = 0;
     while ( defined( my $v = $r->value() ) ) {
-        warn Dumper ${ $v };
+#        warn Dumper ${ $v };
         $i++;
     }
     say "$i parses.";
+    $r->series_restart();
 
     if ( $r->ambiguity_metric() > 1 ){
-        $r->series_restart();
-        use lib qw{/home/Ruslan/MarpaX-ASF-PFG/lib};
-        use MarpaX::ASF::PFG;
         my $pfg = MarpaX::ASF::PFG->new( Marpa::R2::ASF->new( { slr => $r } ) );
 #        say $pfg->show_rules();
         $pfg->ambiguous();
-        $r->series_restart();
+        say Dump $pfg->{rule_spans};
     }
 }
